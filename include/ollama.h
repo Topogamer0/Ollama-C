@@ -1646,9 +1646,8 @@ OLLAMA_API const ollama_error_t *ollama_stream_error(const ollama_stream_t *stre
  * The role is the first one sent by the server ("assistant" before any), the content and the
  * thinking are the concatenation of the fragments (thinking is NULL while there is none), and the
  * tool calls of all the parts are collected; `tool_name` and `images` are NULL. Handy to append
- * the answer to the history with ollama_messages_add_message(), even when the stream ended early,
- * except when it ended with #OLLAMA_ERROR_MEMORY: the message may then be inconsistent and must not
- * be used.
+ * the answer to the history with ollama_messages_add_message(), even when the stream ended early.
+ * When it ended with #OLLAMA_ERROR_MEMORY, the message is valid but may miss the last part.
  *
  * @code{.c}
  * while (ollama_stream_next_chat(stream) != NULL) {}

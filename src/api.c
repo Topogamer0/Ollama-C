@@ -395,9 +395,12 @@ ollama_status_t ollama_create_stream(ollama_client_t *client, const ollama_creat
 }
 
 /* Adds a chat part to the message assembled by the stream. */
-static bool accumulate(ollama_stream_t *s, const ollama_chat_response_t *part) {
+static bool add_part(ollama_stream_t *s, const ollama_chat_response_t *part) {
     const ollama_message_t *m = &part->message;
-    if (!s->role && m->role && *m->role && !(s->role = ol_strdup(m->role))) return false;
+    if (!s->role && m->role && *m->role) {
+        s->role = ol_strdup(m->role);
+        if (!s->role) return false;
+    }
     if (m->content && !buf_puts(&s->content, m->content)) return false;
     if (m->thinking && !buf_puts(&s->thinking, m->thinking)) return false;
     for (size_t i = 0; i < m->tool_calls_count; i++) {
@@ -411,14 +414,22 @@ static bool accumulate(ollama_stream_t *s, const ollama_chat_response_t *part) {
         if (!tool_call_copy(&s->tool_calls[s->tool_calls_count], &m->tool_calls[i])) return false;
         s->tool_calls_count++;
     }
-    const char *content = buf_cstr(&s->content);
-    if (!content) return false;
+    return true;
+}
+
+/*
+ * Adds a part and points the assembled message at the buffers, which may have
+ * moved, even when the part could only be added partially: a failed append
+ * leaves a buffer as it was, so the message is then incomplete but valid.
+ */
+static bool accumulate(ollama_stream_t *s, const ollama_chat_response_t *part) {
+    bool ok = add_part(s, part);
     s->message.role = s->role ? s->role : "assistant";
-    s->message.content = content;
-    s->message.thinking = s->thinking.len ? buf_cstr(&s->thinking) : NULL;
+    s->message.content = s->content.data ? s->content.data : "";
+    s->message.thinking = s->thinking.len ? s->thinking.data : NULL;
     s->message.tool_calls = s->tool_calls;
     s->message.tool_calls_count = s->tool_calls_count;
-    return true;
+    return ok;
 }
 
 static void *stream_next(ollama_stream_t *s, stream_kind_t kind) {

@@ -388,6 +388,35 @@ static void test_parse_responses(void) {
     ollama_response_free(NULL);
 }
 
+/* Replays NDJSON lines through a chat stream as if they had been received. */
+static void feed(ollama_stream_t *s, const char *lines) {
+    buf_append(&s->data, lines, strlen(lines));
+}
+
+static void test_stream_message_after_failure(void) {
+    ollama_stream_t *s = stream_new(STREAM_CHAT);
+    s->finished = true;
+    feed(s, "{\"message\":{\"role\":\"assistant\",\"content\":\"a\"}}\n");
+    CHECK(ollama_stream_next_chat(s) != NULL);
+    CHECK_STR(ollama_stream_message(s)->content, "a");
+
+    /* the content grows (and moves), then appending the thinking runs out of memory */
+    char line[600];
+    char big[401];
+    memset(big, 'b', 400);
+    big[400] = '\0';
+    snprintf(line, sizeof(line), "{\"message\":{\"content\":\"%s\",\"thinking\":\"t\"}}\n", big);
+    feed(s, line);
+    s->thinking.oom = true;
+    CHECK(ollama_stream_next_chat(s) == NULL);
+    CHECK(ollama_stream_error(s)->code == OLLAMA_ERROR_MEMORY);
+    /* found by review: the message pointed to the freed content buffer */
+    const ollama_message_t *m = ollama_stream_message(s);
+    CHECK(m->content && strlen(m->content) == 401 && m->content[0] == 'a');
+    CHECK(m->thinking == NULL);
+    ollama_stream_free(s);
+}
+
 int main(void) {
     RUN(test_parse_host);
     RUN(test_json);
@@ -395,5 +424,6 @@ int main(void) {
     RUN(test_sha256);
     RUN(test_build_requests);
     RUN(test_parse_responses);
+    RUN(test_stream_message_after_failure);
     return test_report();
 }
