@@ -192,7 +192,8 @@ int http_stream_line(ollama_stream_t *s, const char **line, size_t *len) {
             err_set(&s->err, OLLAMA_ERROR_MEMORY, -1, "out of memory");
             return -1;
         }
-        char *start = s->data.data + s->pos;
+        /* the buffer is still NULL when nothing has been received */
+        char *start = s->data.data ? s->data.data + s->pos : NULL;
         size_t avail = s->data.len - s->pos;
         char *nl = avail ? memchr(start, '\n', avail) : NULL;
         if (!nl && s->finished) {

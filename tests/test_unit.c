@@ -3,15 +3,22 @@
 #include "test.h"
 
 #include <locale.h>
-#include <math.h>
 #include <stdlib.h>
 
 /* ---- host: the doctests of _parse_host() in the Python client ---- */
 
 static void check_host(const char *input, const char *expected) {
-    char *out = parse_host(input);
+    char *out;
+    CHECK(parse_host(input, &out) == OLLAMA_OK);
     CHECK_STR(out, expected);
     free(out);
+}
+
+/* hosts for which urlsplit() raises ValueError in the Python client */
+static void check_invalid_host(const char *input) {
+    char *out = (char *)1;
+    if (parse_host(input, &out) != OLLAMA_ERROR_REQUEST) fprintf(stderr, "accepted invalid host: %s\n", input);
+    CHECK(out == NULL);
 }
 
 static void test_parse_host(void) {
@@ -50,6 +57,27 @@ static void test_parse_host(void) {
     check_host("Example.COM", "http://example.com:11434");
     check_host("user:pass@example.com:1234", "http://example.com:1234");
     check_host("example.com:1234?x=1", "http://example.com:1234");
+    check_host("example.com:", "http://example.com:11434");
+    check_host("example.com:0", "http://example.com:11434");
+    check_host("example.com:000080", "http://example.com:80");
+    check_host("[::ffff:1.2.3.4]:8", "http://[::ffff:1.2.3.4]:8");
+    check_host("[fe80::1%eth0]", "http://[fe80::1%eth0]:11434");
+    check_host("[1:2:3:4:5:6:7::]", "http://[1:2:3:4:5:6:7::]:11434");
+    check_host("[v1.fe]", "http://v1.fe:11434");
+
+    /* rejected like the Python client does (ValueError from urlsplit) */
+    check_invalid_host("[::1");
+    check_invalid_host("::1]");
+    check_invalid_host("http://[nope]:80");
+    check_invalid_host("[1.2.3.4]");
+    check_invalid_host("[1::2::3]");
+    check_invalid_host("[1:2:3:4:5:6:7:8:9]");
+    check_invalid_host("[::1.2.3.04]");
+    check_invalid_host("example.com:abc");
+    check_invalid_host("example.com:65536");
+    check_invalid_host("[::1]:99999");
+    /* found by fuzz_host: the output of a host with unbalanced brackets changed when parsed again */
+    check_invalid_host("[\xff[\xff]:\xff/]:\xff/");
 }
 
 /* ---- JSON ---- */
@@ -66,7 +94,10 @@ static void check_roundtrip(const char *input, const char *expected) {
 static void test_json(void) {
     check_roundtrip("null", "null");
     check_roundtrip(" true ", "true");
-    check_roundtrip("[1, -2, 3.5, 1e3, 0.1, -0, 9007199254740993]", "[1,-2,3.5,1000,0.1,0,9007199254740993]");
+    check_roundtrip("[1, -2, 3.5, 1e3, 0.1, -0, 9007199254740993]", "[1,-2,3.5,1000,0.1,-0,9007199254740993]");
+    /* found by fuzz_json: negative zero lost its sign after a round trip ("-0.0" -> "-0" -> "0") */
+    check_roundtrip("[-0.0, -0, 0.0, -0e10]", "[-0,-0,0,-0]");
+    check_roundtrip("-0", "-0");
     check_roundtrip("{\"a\": {\"b\": [\"x\", null]}, \"c\": false}", "{\"a\":{\"b\":[\"x\",null]},\"c\":false}");
     check_roundtrip("\"tab\\t quote\\\" slash\\/ nl\\n \\u0001\"", "\"tab\\t quote\\\" slash/ nl\\n \\u0001\"");
     check_roundtrip("\"\\u00e8 \\ud83d\\ude00\"", "\"\xc3\xa8 \xf0\x9f\x98\x80\"");
@@ -119,7 +150,7 @@ static void test_json(void) {
     ollama_json_t *arr = ollama_json_set(o, "stop", ollama_json_array());
     ollama_json_append(arr, ollama_json_string("\n"));
     ollama_json_set_string(o, "name", "y"); /* replaces */
-    ollama_json_set_number(o, "nan", NAN);
+    ollama_json_set_number(o, "nan", strtod("nan", NULL)); /* NAN warns (C4756) with some MSVC headers */
     out = ollama_json_stringify(o);
     CHECK_STR(out, "{\"name\":\"y\",\"temperature\":0.7,\"num_ctx\":4096,\"flag\":false,\"stop\":[\"\\n\"],\"nan\":null}");
     ollama_free(out);
@@ -129,7 +160,7 @@ static void test_json(void) {
 
     /* numbers do not depend on the locale */
     if (setlocale(LC_NUMERIC, "it_IT.UTF-8") || setlocale(LC_NUMERIC, "de_DE.UTF-8") ||
-        setlocale(LC_NUMERIC, "fr_FR.UTF-8")) {
+        setlocale(LC_NUMERIC, "fr_FR.UTF-8") || setlocale(LC_NUMERIC, "it-IT") || setlocale(LC_NUMERIC, "de-DE")) {
         check_roundtrip("[0.5, 1.25e-3]", "[0.5,0.00125]");
         setlocale(LC_NUMERIC, "C");
     } else {

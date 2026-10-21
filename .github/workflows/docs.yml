@@ -1,0 +1,45 @@
+name: Docs
+
+# Builds the API reference with Doxygen on every pull request (any warning
+# fails the build) and publishes it on GitHub Pages from main, through the
+# gh-pages branch. Pages must be set to "Deploy from a branch: gh-pages / (root)".
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: docs-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  docs:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write # to push the generated site to the gh-pages branch
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install Doxygen
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y doxygen libcurl4-openssl-dev
+      - name: Generate the documentation
+        run: |
+          cmake -S . -B build -DOLLAMA_BUILD_TESTS=OFF -DOLLAMA_BUILD_EXAMPLES=OFF
+          cmake --build build --target docs
+      - name: Publish to GitHub Pages
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        working-directory: build/docs/html
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          touch .nojekyll
+          git init -q -b gh-pages
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "API documentation for ${GITHUB_SHA}"
+          git push -q -f "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" gh-pages

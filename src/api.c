@@ -48,7 +48,7 @@ static ollama_status_t call(ollama_client_t *c, const char *method, const char *
 
 #define CHECK_OUT(c, out)                                                                  \
     do {                                                                                   \
-        if (!(c)) return OLLAMA_ERROR_MEMORY;                                              \
+        if (!(c)) return client_resolve_error();                                           \
         if (!(out)) return err_set(&(c)->err, OLLAMA_ERROR_REQUEST, -1, #out " is NULL"); \
     } while (0)
 
@@ -211,7 +211,7 @@ static ollama_status_t model_body(ollama_client_t *c, const char *model, ollama_
 
 ollama_status_t ollama_delete(ollama_client_t *client, const char *model) {
     ollama_client_t *c = begin(client);
-    if (!c) return OLLAMA_ERROR_MEMORY;
+    if (!c) return client_resolve_error();
     ollama_json_t *body;
     ollama_status_t st = model_body(c, model, &body);
     if (st == OLLAMA_OK) st = request(c, "DELETE", "/api/delete", body, NULL);
@@ -220,7 +220,7 @@ ollama_status_t ollama_delete(ollama_client_t *client, const char *model) {
 
 ollama_status_t ollama_copy(ollama_client_t *client, const char *source, const char *destination) {
     ollama_client_t *c = begin(client);
-    if (!c) return OLLAMA_ERROR_MEMORY;
+    if (!c) return client_resolve_error();
     if (!source || !destination)
         return err_set(&c->err, OLLAMA_ERROR_REQUEST, -1, "must provide a source and a destination");
     ollama_json_t *body = ollama_json_object();
@@ -314,20 +314,26 @@ ollama_status_t ollama_systemone(ollama_client_t *client, const ollama_systemone
 
 /* ---- streams ---- */
 
-static ollama_status_t open_stream(ollama_client_t *c, const char *path, ollama_json_t *body, stream_kind_t kind,
-                                   ollama_stream_t **out) {
-    char *text = ollama_json_stringify(body);
-    ollama_json_free(body);
-    ollama_stream_t *s = text ? calloc(1, sizeof(*s)) : NULL;
-    if (!s) {
-        free(text);
-        return oom(&c->err);
-    }
+ollama_stream_t *stream_new(stream_kind_t kind) {
+    ollama_stream_t *s = calloc(1, sizeof(*s));
+    if (!s) return NULL;
     s->kind = kind;
     err_init(&s->err);
     if (kind == STREAM_CHAT) {
         s->message.role = "assistant";
         s->message.content = "";
+    }
+    return s;
+}
+
+static ollama_status_t open_stream(ollama_client_t *c, const char *path, ollama_json_t *body, stream_kind_t kind,
+                                   ollama_stream_t **out) {
+    char *text = ollama_json_stringify(body);
+    ollama_json_free(body);
+    ollama_stream_t *s = text ? stream_new(kind) : NULL;
+    if (!s) {
+        free(text);
+        return oom(&c->err);
     }
     ollama_status_t st = http_stream_start(c, path, text, s);
     if (st != OLLAMA_OK) {

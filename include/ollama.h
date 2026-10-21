@@ -37,11 +37,13 @@ extern "C" {
 #endif
 
 #define OLLAMA_C_VERSION_MAJOR 0
-#define OLLAMA_C_VERSION_MINOR 1
+#define OLLAMA_C_VERSION_MINOR 2
 #define OLLAMA_C_VERSION_PATCH 0
-#define OLLAMA_C_VERSION "0.1.0"
+#define OLLAMA_C_VERSION "0.2.0"
 
-#if defined(__GNUC__) && __GNUC__ >= 4
+#if defined(_WIN32) && defined(OLLAMA_BUILDING_DLL)
+#define OLLAMA_API __declspec(dllexport)
+#elif defined(__GNUC__) && __GNUC__ >= 4
 #define OLLAMA_API __attribute__((visibility("default")))
 #else
 #define OLLAMA_API

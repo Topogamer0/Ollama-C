@@ -1,0 +1,1 @@
+{"model": "qwen3", "created_at": "2026-01-01T00:00:00Z", "response": "4", "thinking": "2+2 is 4", "context": [1, 2, -3, 2147483647, 99999999999], "done": true, "done_reason": "stop", "total_duration": 4883583458, "load_duration": 1334875, "prompt_eval_count": 26, "prompt_eval_duration": 342546000, "eval_count": 282, "eval_duration": 4535599000}

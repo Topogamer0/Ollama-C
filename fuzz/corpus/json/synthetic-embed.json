@@ -1,0 +1,1 @@
+{"model": "embeddinggemma", "embeddings": [[0.010071029, -0.0017594862, 0.05007221, 1e-30], [-0.0098027075, 0.06042469, 0.025257962, -1500.0]], "total_duration": 14143917, "load_duration": 1019500, "prompt_eval_count": 8}
