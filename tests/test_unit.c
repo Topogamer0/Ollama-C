@@ -78,6 +78,9 @@ static void test_parse_host(void) {
     check_invalid_host("[::1]:99999");
     /* found by fuzz_host: the output of a host with unbalanced brackets changed when parsed again */
     check_invalid_host("[\xff[\xff]:\xff/]:\xff/");
+    /* found by fuzz_host: valid brackets in the user info, broken ones in the host */
+    check_invalid_host("https://user:pw@E[::1]:0@::][1E:p?q#f");
+    check_host("[::1]@example.com", "http://example.com:11434");
 }
 
 /* ---- JSON ---- */

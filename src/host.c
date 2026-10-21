@@ -144,17 +144,19 @@ ollama_status_t parse_host(const char *host, char **out) {
     size_t port_len = 0;
     const char *bracket = memchr(hostinfo, '[', hostinfo_len);
     if (bracket) {
+        /* the brackets checked above may be in the user info: check the host's own */
         name = bracket + 1;
         size_t rest = hostinfo_len - (size_t)(name - hostinfo);
         const char *close = memchr(name, ']', rest);
-        name_len = close ? (size_t)(close - name) : rest;
-        if (close) {
-            const char *colon = memchr(close, ':', rest - name_len);
-            if (colon) {
-                port_str = colon + 1;
-                port_len = rest - (size_t)(port_str - name);
-            }
+        if (!close || !valid_bracketed_host(name, (size_t)(close - name))) return OLLAMA_ERROR_REQUEST;
+        name_len = (size_t)(close - name);
+        const char *colon = memchr(close, ':', rest - name_len);
+        if (colon) {
+            port_str = colon + 1;
+            port_len = rest - (size_t)(port_str - name);
         }
+    } else if (memchr(hostinfo, ']', hostinfo_len)) {
+        return OLLAMA_ERROR_REQUEST;
     } else {
         name = hostinfo;
         const char *colon = memchr(hostinfo, ':', hostinfo_len);
@@ -164,9 +166,6 @@ ollama_status_t parse_host(const char *host, char **out) {
             port_len = hostinfo_len - name_len - 1;
         }
     }
-    /* the user info had brackets but the host does not, or the other way round */
-    if (memchr(name, '[', name_len) || memchr(name, ']', name_len)) return OLLAMA_ERROR_REQUEST;
-
     if (port_str && port_len > 0) {
         long value = 0;
         for (size_t i = 0; i < port_len; i++) {
