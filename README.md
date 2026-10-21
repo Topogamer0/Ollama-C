@@ -238,3 +238,9 @@ ollama pull gemma3
 `ctest --test-dir build` runs the unit tests and the integration tests, which drive the public API
 against a fake Ollama server ([`tests/mock_server.py`](tests/mock_server.py)) and check both the
 requests sent and the parsing of the answers.
+
+## License
+
+[MIT](LICENSE). The API, the host parsing rules and the error messages follow
+[ollama-python](https://github.com/ollama/ollama-python), Copyright (c) Ollama, also released under
+the MIT License.
