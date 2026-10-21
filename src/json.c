@@ -12,7 +12,7 @@
 struct ollama_json {
     ollama_json_type_t type;
     union {
-        bool boolean;
+        bool bool_value;
         struct {
             double value;
             int64_t ivalue;
@@ -43,7 +43,7 @@ ollama_json_t *ollama_json_null(void) { return json_new(OLLAMA_JSON_NULL); }
 
 ollama_json_t *ollama_json_bool(bool value) {
     ollama_json_t *v = json_new(OLLAMA_JSON_BOOL);
-    if (v) v->u.boolean = value;
+    if (v) v->u.bool_value = value;
     return v;
 }
 
@@ -188,7 +188,7 @@ ollama_json_t *ollama_json_copy(const ollama_json_t *v) {
     if (!v) return NULL;
     switch (v->type) {
     case OLLAMA_JSON_NULL: return ollama_json_null();
-    case OLLAMA_JSON_BOOL: return ollama_json_bool(v->u.boolean);
+    case OLLAMA_JSON_BOOL: return ollama_json_bool(v->u.bool_value);
     case OLLAMA_JSON_NUMBER: {
         ollama_json_t *n = json_new(OLLAMA_JSON_NUMBER);
         if (n) n->u.number = v->u.number;
@@ -263,7 +263,7 @@ int64_t ollama_json_as_int(const ollama_json_t *v) {
     return v && v->type == OLLAMA_JSON_NUMBER ? v->u.number.ivalue : 0;
 }
 
-bool ollama_json_as_bool(const ollama_json_t *v) { return v && v->type == OLLAMA_JSON_BOOL && v->u.boolean; }
+bool ollama_json_as_bool(const ollama_json_t *v) { return v && v->type == OLLAMA_JSON_BOOL && v->u.bool_value; }
 
 /* ---- locale independent number conversion ---- */
 
@@ -276,9 +276,9 @@ static const char *decimal_point(void) {
 static double number_from_text(const char *s, size_t len) {
     const char *dp = decimal_point();
     size_t dplen = strlen(dp);
-    char small[128];
+    char stack_buf[128];
     size_t cap = len * dplen + 1;
-    char *tmp = cap <= sizeof(small) ? small : malloc(cap);
+    char *tmp = cap <= sizeof(stack_buf) ? stack_buf : malloc(cap);
     if (!tmp) return 0.0;
     size_t n = 0;
     for (size_t i = 0; i < len; i++) {
@@ -291,7 +291,7 @@ static double number_from_text(const char *s, size_t len) {
     }
     tmp[n] = '\0';
     double d = strtod(tmp, NULL);
-    if (tmp != small) free(tmp);
+    if (tmp != stack_buf) free(tmp);
     return d;
 }
 
@@ -346,7 +346,7 @@ bool json_write(buf_t *b, const ollama_json_t *v) {
     if (!v) return buf_puts(b, "null");
     switch (v->type) {
     case OLLAMA_JSON_NULL: return buf_puts(b, "null");
-    case OLLAMA_JSON_BOOL: return buf_puts(b, v->u.boolean ? "true" : "false");
+    case OLLAMA_JSON_BOOL: return buf_puts(b, v->u.bool_value ? "true" : "false");
     case OLLAMA_JSON_NUMBER: {
         char num[64];
         if (v->u.number.is_int)
@@ -532,7 +532,7 @@ static ollama_json_t *parse_number(parser_t *ps) {
         bool negative = *start == '-';
         uint64_t limit = negative ? (uint64_t)INT64_MAX + 1 : (uint64_t)INT64_MAX;
         uint64_t acc = 0;
-        for (const char *p = start + negative; p < ps->p; p++) {
+        for (const char *p = negative ? start + 1 : start; p < ps->p; p++) {
             unsigned digit = (unsigned)(*p - '0');
             if (acc > (limit - digit) / 10) {
                 is_int = false;
@@ -540,7 +540,8 @@ static ollama_json_t *parse_number(parser_t *ps) {
             }
             acc = acc * 10 + digit;
         }
-        if (is_int) {
+        /* "-0" is not an integer: as a double it keeps its sign through a round trip */
+        if (is_int && !(negative && acc == 0)) {
             int64_t value = negative ? (acc == (uint64_t)INT64_MAX + 1 ? INT64_MIN : -(int64_t)acc) : (int64_t)acc;
             return ollama_json_int(value);
         }

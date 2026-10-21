@@ -3,15 +3,22 @@
 #include "test.h"
 
 #include <locale.h>
-#include <math.h>
 #include <stdlib.h>
 
 /* ---- host: the doctests of _parse_host() in the Python client ---- */
 
 static void check_host(const char *input, const char *expected) {
-    char *out = parse_host(input);
+    char *out;
+    CHECK(parse_host(input, &out) == OLLAMA_OK);
     CHECK_STR(out, expected);
     free(out);
+}
+
+/* hosts for which urlsplit() raises ValueError in the Python client */
+static void check_invalid_host(const char *input) {
+    char *out = (char *)1;
+    if (parse_host(input, &out) != OLLAMA_ERROR_REQUEST) fprintf(stderr, "accepted invalid host: %s\n", input);
+    CHECK(out == NULL);
 }
 
 static void test_parse_host(void) {
@@ -50,6 +57,51 @@ static void test_parse_host(void) {
     check_host("Example.COM", "http://example.com:11434");
     check_host("user:pass@example.com:1234", "http://example.com:1234");
     check_host("example.com:1234?x=1", "http://example.com:1234");
+    check_host("example.com:", "http://example.com:11434");
+    check_host("example.com:0", "http://example.com:11434");
+    check_host("example.com:000080", "http://example.com:80");
+    check_host("[::ffff:1.2.3.4]:8", "http://[::ffff:1.2.3.4]:8");
+    check_host("[fe80::1%eth0]", "http://[fe80::1%eth0]:11434");
+    check_host("[1:2:3:4:5:6:7::]", "http://[1:2:3:4:5:6:7::]:11434");
+    check_host("[v1.fe]", "http://v1.fe:11434");
+    check_host("[v1.a:b]", "http://[v1.a:b]:11434");
+
+    /* rejected like the Python client does (ValueError from urlsplit) */
+    check_invalid_host("[::1");
+    check_invalid_host("::1]");
+    check_invalid_host("http://[nope]:80");
+    check_invalid_host("[1.2.3.4]");
+    check_invalid_host("[1::2::3]");
+    check_invalid_host("[1:2:3:4:5:6:7:8:9]");
+    check_invalid_host("[::1.2.3.04]");
+    check_invalid_host("example.com:abc");
+    check_invalid_host("example.com:65536");
+    check_invalid_host("[::1]:99999");
+    /* found by fuzz_host: the output of a host with unbalanced brackets changed when parsed again */
+    check_invalid_host("[\xff[\xff]:\xff/]:\xff/");
+    /* found by fuzz_host: valid brackets in the user info, broken ones in the host */
+    check_invalid_host("https://user:pw@E[::1]:0@::][1E:p?q#f");
+    /* the rules of current CPython (3.11+), which check the part after the last '@' */
+    check_host("http://user:p[w@[::1]:11434", "http://[::1]:11434");
+    check_host("u[x]@[::1]", "http://[::1]:11434");
+    check_host("u]@[::1", "http://[::1]:11434");
+    check_host("[x]@v1.abc:80", "http://v1.abc:80");
+    check_invalid_host("[::1]@example.com");
+    check_invalid_host("x[::1]");
+    check_invalid_host("[::1]x:80");
+    check_invalid_host("[::1]]");
+    check_invalid_host("[::1]:80@x");
+    /* tabs and newlines are ignored, like the CR of a CRLF .env file */
+    check_host("192.168.1.10:11434\r", "http://192.168.1.10:11434");
+    check_host("http://localhost:11434\r\n", "http://localhost:11434");
+    check_host("local\thost", "http://localhost:11434");
+    check_host("[::1]:11434\r", "http://[::1]:11434");
+    /* the zone of a scoped address keeps its case, IPvFuture accepts V */
+    check_host("[fe80::1%Eth0]", "http://[fe80::1%Eth0]:11434");
+    check_host("[V1.abc]:8080", "http://v1.abc:8080");
+    /* found by fuzz_host: IPvFuture literals with characters that RFC 3986 does not allow */
+    check_invalid_host("[v1.[v]");
+    check_invalid_host("[v4.a b]");
 }
 
 /* ---- JSON ---- */
@@ -66,7 +118,10 @@ static void check_roundtrip(const char *input, const char *expected) {
 static void test_json(void) {
     check_roundtrip("null", "null");
     check_roundtrip(" true ", "true");
-    check_roundtrip("[1, -2, 3.5, 1e3, 0.1, -0, 9007199254740993]", "[1,-2,3.5,1000,0.1,0,9007199254740993]");
+    check_roundtrip("[1, -2, 3.5, 1e3, 0.1, -0, 9007199254740993]", "[1,-2,3.5,1000,0.1,-0,9007199254740993]");
+    /* found by fuzz_json: negative zero lost its sign after a round trip ("-0.0" -> "-0" -> "0") */
+    check_roundtrip("[-0.0, -0, 0.0, -0e10]", "[-0,-0,0,-0]");
+    check_roundtrip("-0", "-0");
     check_roundtrip("{\"a\": {\"b\": [\"x\", null]}, \"c\": false}", "{\"a\":{\"b\":[\"x\",null]},\"c\":false}");
     check_roundtrip("\"tab\\t quote\\\" slash\\/ nl\\n \\u0001\"", "\"tab\\t quote\\\" slash/ nl\\n \\u0001\"");
     check_roundtrip("\"\\u00e8 \\ud83d\\ude00\"", "\"\xc3\xa8 \xf0\x9f\x98\x80\"");
@@ -119,7 +174,7 @@ static void test_json(void) {
     ollama_json_t *arr = ollama_json_set(o, "stop", ollama_json_array());
     ollama_json_append(arr, ollama_json_string("\n"));
     ollama_json_set_string(o, "name", "y"); /* replaces */
-    ollama_json_set_number(o, "nan", NAN);
+    ollama_json_set_number(o, "nan", strtod("nan", NULL)); /* NAN warns (C4756) with some MSVC headers */
     out = ollama_json_stringify(o);
     CHECK_STR(out, "{\"name\":\"y\",\"temperature\":0.7,\"num_ctx\":4096,\"flag\":false,\"stop\":[\"\\n\"],\"nan\":null}");
     ollama_free(out);
@@ -129,7 +184,7 @@ static void test_json(void) {
 
     /* numbers do not depend on the locale */
     if (setlocale(LC_NUMERIC, "it_IT.UTF-8") || setlocale(LC_NUMERIC, "de_DE.UTF-8") ||
-        setlocale(LC_NUMERIC, "fr_FR.UTF-8")) {
+        setlocale(LC_NUMERIC, "fr_FR.UTF-8") || setlocale(LC_NUMERIC, "it-IT") || setlocale(LC_NUMERIC, "de-DE")) {
         check_roundtrip("[0.5, 1.25e-3]", "[0.5,0.00125]");
         setlocale(LC_NUMERIC, "C");
     } else {
@@ -354,6 +409,35 @@ static void test_parse_responses(void) {
     ollama_response_free(NULL);
 }
 
+/* Replays NDJSON lines through a chat stream as if they had been received. */
+static void feed(ollama_stream_t *s, const char *lines) {
+    buf_append(&s->data, lines, strlen(lines));
+}
+
+static void test_stream_message_after_failure(void) {
+    ollama_stream_t *s = stream_new(STREAM_CHAT);
+    s->finished = true;
+    feed(s, "{\"message\":{\"role\":\"assistant\",\"content\":\"a\"}}\n");
+    CHECK(ollama_stream_next_chat(s) != NULL);
+    CHECK_STR(ollama_stream_message(s)->content, "a");
+
+    /* the content grows (and moves), then appending the thinking runs out of memory */
+    char line[600];
+    char big[401];
+    memset(big, 'b', 400);
+    big[400] = '\0';
+    snprintf(line, sizeof(line), "{\"message\":{\"content\":\"%s\",\"thinking\":\"t\"}}\n", big);
+    feed(s, line);
+    s->thinking.oom = true;
+    CHECK(ollama_stream_next_chat(s) == NULL);
+    CHECK(ollama_stream_error(s)->code == OLLAMA_ERROR_MEMORY);
+    /* found by review: the message pointed to the freed content buffer */
+    const ollama_message_t *m = ollama_stream_message(s);
+    CHECK(m->content && strlen(m->content) == 401 && m->content[0] == 'a');
+    CHECK(m->thinking == NULL);
+    ollama_stream_free(s);
+}
+
 int main(void) {
     RUN(test_parse_host);
     RUN(test_json);
@@ -361,5 +445,6 @@ int main(void) {
     RUN(test_sha256);
     RUN(test_build_requests);
     RUN(test_parse_responses);
+    RUN(test_stream_message_after_failure);
     return test_report();
 }

@@ -4,6 +4,13 @@ A C library for [Ollama](https://ollama.com): a port of the official Python libr
 [ollama-python](https://github.com/ollama/ollama-python), with the same functions, parameters and
 behavior, written in portable C99 on top of libcurl.
 
+[![CI](https://github.com/Topogamer0/Ollama-C/actions/workflows/ci.yml/badge.svg)](https://github.com/Topogamer0/Ollama-C/actions/workflows/ci.yml)
+[![Docs](https://github.com/Topogamer0/Ollama-C/actions/workflows/docs.yml/badge.svg)](https://topogamer0.github.io/Ollama-C/)
+
+**Documentation:** the [API reference](https://topogamer0.github.io/Ollama-C/) describes every
+function, type and field. It is generated from `include/ollama.h` with Doxygen
+(`cmake --build build --target docs` builds it locally in `build/docs/html`).
+
 ```c
 #include <ollama.h>
 #include <stdio.h>
@@ -36,10 +43,24 @@ int main(void) {
 - A small JSON API for options, schemas, tool definitions and tool arguments
 - No dependencies besides libcurl; works from C and C++
 
+## Supported platforms
+
+| Platform | Compilers | libcurl | Tested in CI |
+| --- | --- | --- | --- |
+| Linux (Ubuntu 24.04) | GCC, Clang | distribution package | static and shared builds, ASan + UBSan, fuzzing |
+| macOS 15 | Apple Clang | system libcurl | static build |
+| Windows (Server 2025) | MSVC (Visual Studio 2026) | [vcpkg](https://vcpkg.io) | static library and DLL, `/W4 /WX` |
+
+Any other system with a C99 compiler, CMake 3.14+ and libcurl 7.28+ should work (for example
+FreeBSD or MinGW), but it is not tested. On Windows, Visual Studio 2019 16.10 or later is needed.
+The commands below use `ctest --test-dir` and `cmake --install`, which need CMake 3.20 and 3.15;
+with older versions run `ctest` from the build directory and `cmake --build build --target install`.
+
 ## Building
 
 Requirements: a C99 compiler, CMake 3.14+, libcurl with its development headers
-(`libcurl4-openssl-dev` on Debian/Ubuntu, `libcurl-devel` on Fedora, `curl` on Homebrew).
+(`libcurl4-openssl-dev` on Debian/Ubuntu, `libcurl-devel` on Fedora, `curl` on Homebrew,
+vcpkg on Windows).
 
 ```sh
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
@@ -48,8 +69,24 @@ ctest --test-dir build            # optional: runs the tests (needs Python 3 for
 sudo cmake --install build        # installs libollama, ollama.h, CMake and pkg-config files
 ```
 
-Options: `-DBUILD_SHARED_LIBS=ON` for a shared library, `-DOLLAMA_BUILD_EXAMPLES=OFF`,
-`-DOLLAMA_BUILD_TESTS=OFF`.
+On Windows, [vcpkg](https://vcpkg.io) installs libcurl from the `vcpkg.json` manifest:
+
+```powershell
+cmake -S . -B build -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake"
+cmake --build build --config Release
+ctest --test-dir build -C Release
+```
+
+With MSVC, compile your own code with `/std:c11` or later: in its default mode `/W4` warns about the
+designated initializers used for requests (C4204, C4221), which are standard C99. On Windows the
+executables of the build (tests and examples) are written to `build/bin/<config>`, next to the DLLs
+they need. Models answer in UTF-8: run `chcp 65001` in the console before the examples to see
+accented letters and emoji correctly. File paths (images, blobs) are passed to `fopen()`, so they
+are in the active code page, like the arguments of `main()`.
+
+Options: `-DBUILD_SHARED_LIBS=ON` for a shared library (a DLL on Windows),
+`-DOLLAMA_BUILD_EXAMPLES=OFF`, `-DOLLAMA_BUILD_TESTS=OFF`, `-DOLLAMA_WERROR=ON` to treat warnings as
+errors, `-DOLLAMA_BUILD_FUZZERS=ON` for the libFuzzer targets (Clang only).
 
 Using the library in your project:
 
@@ -168,7 +205,7 @@ for (size_t i = 0; i < res->message.tool_calls_count; i++) {
 ```
 
 Tools can also be written as JSON with `ollama_json_parse()`. See
-[`examples/tools.c`](examples/tools.c) for the full round trip.
+[`examples/tools.c`](https://github.com/Topogamer0/Ollama-C/blob/main/examples/tools.c) for the full round trip.
 
 ### Structured outputs, images, embeddings
 
@@ -223,7 +260,7 @@ The default client (`NULL`) is not thread-safe. In multi-threaded programs call
 
 ## Examples
 
-The [`examples`](examples) directory mirrors the examples of ollama-python and is built with the
+The [`examples`](https://github.com/Topogamer0/Ollama-C/tree/main/examples) directory mirrors the examples of ollama-python and is built with the
 library (`build/examples/`): `generate`, `generate-stream`, `chat`, `chat-stream`,
 `chat-with-history`, `tools`, `structured-outputs`, `thinking`, `multimodal`, `embed`, `list`,
 `show`, `ps`, `pull`, `create`, `web-search`.
@@ -236,11 +273,23 @@ ollama pull gemma3
 ## Tests
 
 `ctest --test-dir build` runs the unit tests and the integration tests, which drive the public API
-against a fake Ollama server ([`tests/mock_server.py`](tests/mock_server.py)) and check both the
+against a fake Ollama server ([`tests/mock_server.py`](https://github.com/Topogamer0/Ollama-C/blob/main/tests/mock_server.py)) and check both the
 requests sent and the parsing of the answers.
+
+The JSON parser, the response parsers (regular and streaming) and the `OLLAMA_HOST` parser are
+fuzzed with libFuzzer, AddressSanitizer and UndefinedBehaviorSanitizer, starting from a corpus of
+real Ollama responses ([`fuzz/corpus`](https://github.com/Topogamer0/Ollama-C/tree/main/fuzz/corpus)). The inputs of past crashes are kept in
+[`fuzz/regressions`](https://github.com/Topogamer0/Ollama-C/tree/main/fuzz/regressions) and replayed by `ctest` on every platform:
+
+```sh
+CC=clang cmake -S . -B build-fuzz -DOLLAMA_BUILD_FUZZERS=ON
+cmake --build build-fuzz --target fuzz_json fuzz_host
+mkdir -p build-fuzz/corpus    # new inputs go to the first directory, the others are only read
+./build-fuzz/fuzz/fuzz_json -dict=fuzz/json.dict build-fuzz/corpus fuzz/corpus/json
+```
 
 ## License
 
-[MIT](LICENSE). The API, the host parsing rules and the error messages follow
+[MIT](https://github.com/Topogamer0/Ollama-C/blob/main/LICENSE). The API, the host parsing rules and the error messages follow
 [ollama-python](https://github.com/ollama/ollama-python), Copyright (c) Ollama, also released under
 the MIT License.

@@ -1,0 +1,11 @@
+{
+  "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json",
+  "name": "ollama-c",
+  "version": "0.2.0",
+  "description": "C client library for Ollama, a port of ollama-python",
+  "homepage": "https://github.com/Topogamer0/Ollama-C",
+  "license": "MIT",
+  "dependencies": [
+    "curl"
+  ]
+}

@@ -1,0 +1,5 @@
+{"status": "pulling manifest"}
+{"status": "pulling 6a0746a1ec1a", "digest": "sha256:6a0746a1ec1aef3e7ec53868f220ff6e389f6f8ef87a01d77c96807de94ca2aa", "total": 4661211424, "completed": 2147483648}
+{"status": "verifying sha256 digest"}
+{"status": "writing manifest"}
+{"status": "success"}

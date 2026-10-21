@@ -1,0 +1,6 @@
+{"model":"tiny","created_at":"2026-10-21T19:33:57.852734135Z","message":{"role":"assistant","content":"��e"},"done":false}
+{"model":"tiny","created_at":"2026-10-21T19:33:57.853454523Z","message":{"role":"assistant","content":"\u0004"},"done":false}
+{"model":"tiny","created_at":"2026-10-21T19:33:57.854013649Z","message":{"role":"assistant","content":"f"},"done":false}
+{"model":"tiny","created_at":"2026-10-21T19:33:57.854461504Z","message":{"role":"assistant","content":"p"},"done":false}
+{"model":"tiny","created_at":"2026-10-21T19:33:57.855349586Z","message":{"role":"assistant","content":"��"},"done":false}
+{"model":"tiny","created_at":"2026-10-21T19:33:57.855957354Z","message":{"role":"assistant","content":""},"done":true,"done_reason":"length","total_duration":28948116,"load_duration":1461607,"prompt_eval_count":44,"prompt_eval_cached_count":43,"prompt_eval_duration":20818000,"eval_count":8,"eval_duration":3003000}

@@ -29,15 +29,23 @@
 #endif
 
 static ollama_client_t *default_client;
-static bool default_client_failed;
+/* why the default client could not be created */
+static ollama_error_t default_client_error = {OLLAMA_OK, -1, ""};
 
-ollama_client_t *ollama_client_new(const char *host) {
+/* Creates a client; on failure *status tells whether the host was invalid or memory ran out. */
+static ollama_client_t *client_create(const char *host, ollama_status_t *status) {
+    *status = OLLAMA_ERROR_MEMORY;
     ollama_client_t *c = calloc(1, sizeof(*c));
     if (!c) return NULL;
     err_init(&c->err);
 
     if (!host || !*host) host = getenv("OLLAMA_HOST");
-    c->host = parse_host(host);
+    ollama_status_t st = parse_host(host, &c->host);
+    if (st != OLLAMA_OK) {
+        *status = st;
+        ollama_client_free(c);
+        return NULL;
+    }
     c->user_agent = ol_format("ollama-c/%s (%s %s) libcurl/%s", OLLAMA_C_VERSION, OLLAMA_ARCH, OLLAMA_OS,
                               curl_version_info(CURLVERSION_NOW)->version);
     c->curl = curl_easy_init();
@@ -49,14 +57,21 @@ ollama_client_t *ollama_client_new(const char *host) {
     const char *api_key = getenv("OLLAMA_API_KEY");
     if (api_key && *api_key) {
         char *bearer = ol_format("Bearer %s", api_key);
-        ollama_status_t st = bearer ? ollama_client_set_header(c, "Authorization", bearer) : OLLAMA_ERROR_MEMORY;
+        st = bearer ? ollama_client_set_header(c, "Authorization", bearer) : OLLAMA_ERROR_MEMORY;
         free(bearer);
         if (st != OLLAMA_OK) {
+            *status = st;
             ollama_client_free(c);
             return NULL;
         }
     }
+    *status = OLLAMA_OK;
     return c;
+}
+
+ollama_client_t *ollama_client_new(const char *host) {
+    ollama_status_t status;
+    return client_create(host, &status);
 }
 
 void ollama_client_free(ollama_client_t *c) {
@@ -77,15 +92,24 @@ void ollama_client_free(ollama_client_t *c) {
 ollama_client_t *client_resolve(ollama_client_t *c) {
     if (c) return c;
     if (!default_client) {
-        default_client = ollama_client_new(NULL);
-        default_client_failed = default_client == NULL;
+        ollama_status_t status;
+        default_client = client_create(NULL, &status);
+        default_client_error.code = status;
+        default_client_error.message = status == OLLAMA_OK            ? ""
+                                       : status == OLLAMA_ERROR_REQUEST ? "invalid OLLAMA_HOST or OLLAMA_API_KEY"
+                                                                        : "out of memory";
     }
     return default_client;
 }
 
+ollama_status_t client_resolve_error(void) {
+    return default_client_error.code != OLLAMA_OK ? default_client_error.code : OLLAMA_ERROR_MEMORY;
+}
+
 void ollama_cleanup(void) {
     ollama_client_free(default_client);
-    default_client_failed = false;
+    default_client_error.code = OLLAMA_OK;
+    default_client_error.message = "";
 }
 
 const char *ollama_client_host(const ollama_client_t *c) {
@@ -101,7 +125,7 @@ const char *client_header(const ollama_client_t *c, const char *name) {
 
 ollama_status_t ollama_client_set_header(ollama_client_t *c, const char *name, const char *value) {
     c = client_resolve(c);
-    if (!c) return OLLAMA_ERROR_MEMORY;
+    if (!c) return client_resolve_error();
     if (!name || !*name || strpbrk(name, ":\r\n") || (value && strpbrk(value, "\r\n")))
         return err_set(&c->err, OLLAMA_ERROR_REQUEST, -1, "invalid header");
 
@@ -144,9 +168,6 @@ void ollama_client_set_timeout(ollama_client_t *c, long timeout_ms) {
 }
 
 const ollama_error_t *ollama_last_error(const ollama_client_t *c) {
-    static const ollama_error_t no_client = {OLLAMA_ERROR_MEMORY, -1, "out of memory"};
-    static const ollama_error_t no_error = {OLLAMA_OK, -1, ""};
     if (!c) c = default_client;
-    if (!c) return default_client_failed ? &no_client : &no_error;
-    return &c->err.pub;
+    return c ? &c->err.pub : &default_client_error;
 }

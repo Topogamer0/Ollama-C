@@ -281,7 +281,7 @@ class Server(ThreadingHTTPServer):
 
   def handle_error(self, request, client_address):
     # the tests close some streams before their end
-    if not isinstance(sys.exc_info()[1], (BrokenPipeError, ConnectionResetError)):
+    if not isinstance(sys.exc_info()[1], ConnectionError):
       super().handle_error(request, client_address)
 
 

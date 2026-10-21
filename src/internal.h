@@ -4,6 +4,17 @@
 
 #include "ollama.h"
 
+/* curl.h includes the Windows headers: keep them small and free of macros
+ * such as `small` (rpcndr.h), `min` and `max` */
+#ifdef _WIN32
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#endif
+
 #include <curl/curl.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -79,8 +90,9 @@ bool json_write(buf_t *b, const ollama_json_t *value);
 
 /* ---- host (host.c) ---- */
 
-/* Normalizes a host like the Python client's _parse_host(). */
-char *parse_host(const char *host);
+/* Normalizes a host like the Python client's _parse_host() into *out.
+ * Returns OLLAMA_ERROR_REQUEST for a host that Python would reject. */
+ollama_status_t parse_host(const char *host, char **out);
 
 /* ---- client (client.c) ---- */
 
@@ -100,6 +112,8 @@ struct ollama_client {
 };
 
 ollama_client_t *client_resolve(ollama_client_t *client);
+/* Status to return when client_resolve(NULL) failed. */
+ollama_status_t client_resolve_error(void);
 const char *client_header(const ollama_client_t *client, const char *name);
 
 /* ---- http (http.c) ---- */
@@ -145,6 +159,8 @@ struct ollama_stream {
     ollama_message_t message;
 };
 
+/* Allocates a stream that has not started yet (api.c). */
+ollama_stream_t *stream_new(stream_kind_t kind);
 /* Starts a streaming POST request; takes ownership of `body`. */
 ollama_status_t http_stream_start(ollama_client_t *client, const char *path, char *body, ollama_stream_t *stream);
 /* Next non-empty line: 1 = line, 0 = end of stream, -1 = error (stream->err is set). */

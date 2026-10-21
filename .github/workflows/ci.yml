@@ -4,35 +4,104 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
-  test:
-    runs-on: ubuntu-latest
+  linux:
+    name: Linux (${{ matrix.compiler }}, shared=${{ matrix.shared }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
         compiler: [gcc, clang]
         shared: [OFF, ON]
     steps:
-      - uses: actions/checkout@v4
-      - name: Install libcurl
-        run: sudo apt-get update && sudo apt-get install -y libcurl4-openssl-dev
+      - uses: actions/checkout@v5
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libcurl4-openssl-dev
+          # a locale with a decimal comma, for the locale-independence tests
+          sudo locale-gen it_IT.UTF-8
       - name: Configure
         run: >
           cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
           -DCMAKE_C_COMPILER=${{ matrix.compiler }}
           -DBUILD_SHARED_LIBS=${{ matrix.shared }}
-          -DCMAKE_C_FLAGS="-Werror -fsanitize=address,undefined -fno-omit-frame-pointer"
+          -DOLLAMA_WERROR=ON -DCMAKE_REQUIRE_FIND_PACKAGE_Python3=ON
+          -DCMAKE_C_FLAGS="-fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer"
       - name: Build
-        run: cmake --build build -j
+        run: cmake --build build --parallel
       - name: Test
         run: ctest --test-dir build --output-on-failure
 
   macos:
-    runs-on: macos-latest
+    name: macOS (Apple Clang)
+    runs-on: macos-15
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - name: Build and test
+      - uses: actions/checkout@v5
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DOLLAMA_WERROR=ON -DCMAKE_REQUIRE_FIND_PACKAGE_Python3=ON
+      - name: Build
+        run: cmake --build build --parallel
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
+  windows:
+    name: Windows (MSVC, shared=${{ matrix.shared }})
+    runs-on: windows-2025
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        shared: [OFF, ON]
+    steps:
+      - uses: actions/checkout@v5
+      - name: Configure
+        # the vcpkg toolchain installs libcurl as declared in vcpkg.json
+        run: >
+          cmake -S . -B build -A x64
+          "-DCMAKE_TOOLCHAIN_FILE=$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
+          -DBUILD_SHARED_LIBS=${{ matrix.shared }}
+          -DOLLAMA_WERROR=ON -DCMAKE_REQUIRE_FIND_PACKAGE_Python3=ON
+      - name: Build
+        run: cmake --build build --config Release --parallel
+      - name: Test
+        run: ctest --test-dir build -C Release --output-on-failure
+
+  fuzz:
+    name: Fuzzing (libFuzzer, ASan + UBSan)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install dependencies
         run: |
-          cmake -S . -B build -DCMAKE_C_FLAGS=-Werror
-          cmake --build build -j
-          ctest --test-dir build --output-on-failure
+          sudo apt-get update
+          sudo apt-get install -y libcurl4-openssl-dev clang-18 libclang-rt-18-dev
+      - name: Build the fuzz targets
+        run: |
+          cmake -S . -B build -DCMAKE_C_COMPILER=clang-18 -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DOLLAMA_BUILD_FUZZERS=ON -DOLLAMA_BUILD_TESTS=OFF -DOLLAMA_BUILD_EXAMPLES=OFF
+          cmake --build build --target fuzz_json fuzz_host --parallel
+      - name: Fuzz the JSON and response parsers
+        run: |
+          mkdir -p work/json artifacts
+          cp fuzz/corpus/json/* fuzz/regressions/json-* fuzz/regressions/stream-* work/json/ 2>/dev/null || true
+          ./build/fuzz/fuzz_json -max_total_time=240 -max_len=16384 -timeout=10 -print_final_stats=1 \
+            -dict=fuzz/json.dict -artifact_prefix=artifacts/ work/json
+      - name: Fuzz the host parser
+        run: |
+          mkdir -p work/host
+          cp fuzz/corpus/host/* fuzz/regressions/host-* work/host/ 2>/dev/null || true
+          ./build/fuzz/fuzz_host -max_total_time=60 -timeout=10 -print_final_stats=1 \
+            -artifact_prefix=artifacts/ work/host
+      - name: Upload the crashing inputs
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: fuzz-artifacts
+          path: artifacts/

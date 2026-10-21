@@ -48,7 +48,7 @@ static ollama_status_t call(ollama_client_t *c, const char *method, const char *
 
 #define CHECK_OUT(c, out)                                                                  \
     do {                                                                                   \
-        if (!(c)) return OLLAMA_ERROR_MEMORY;                                              \
+        if (!(c)) return client_resolve_error();                                           \
         if (!(out)) return err_set(&(c)->err, OLLAMA_ERROR_REQUEST, -1, #out " is NULL"); \
     } while (0)
 
@@ -182,7 +182,7 @@ ollama_status_t ollama_create_blob(ollama_client_t *client, const char *path, ch
         st = oom(&c->err);
     }
     fclose(f);
-    if (st == OLLAMA_OK && !(*digest = ol_strdup(hex))) st = oom(&c->err);
+    if (st == OLLAMA_OK && (*digest = ol_strdup(hex)) == NULL) st = oom(&c->err);
     return st;
 }
 
@@ -211,7 +211,7 @@ static ollama_status_t model_body(ollama_client_t *c, const char *model, ollama_
 
 ollama_status_t ollama_delete(ollama_client_t *client, const char *model) {
     ollama_client_t *c = begin(client);
-    if (!c) return OLLAMA_ERROR_MEMORY;
+    if (!c) return client_resolve_error();
     ollama_json_t *body;
     ollama_status_t st = model_body(c, model, &body);
     if (st == OLLAMA_OK) st = request(c, "DELETE", "/api/delete", body, NULL);
@@ -220,7 +220,7 @@ ollama_status_t ollama_delete(ollama_client_t *client, const char *model) {
 
 ollama_status_t ollama_copy(ollama_client_t *client, const char *source, const char *destination) {
     ollama_client_t *c = begin(client);
-    if (!c) return OLLAMA_ERROR_MEMORY;
+    if (!c) return client_resolve_error();
     if (!source || !destination)
         return err_set(&c->err, OLLAMA_ERROR_REQUEST, -1, "must provide a source and a destination");
     ollama_json_t *body = ollama_json_object();
@@ -314,20 +314,26 @@ ollama_status_t ollama_systemone(ollama_client_t *client, const ollama_systemone
 
 /* ---- streams ---- */
 
-static ollama_status_t open_stream(ollama_client_t *c, const char *path, ollama_json_t *body, stream_kind_t kind,
-                                   ollama_stream_t **out) {
-    char *text = ollama_json_stringify(body);
-    ollama_json_free(body);
-    ollama_stream_t *s = text ? calloc(1, sizeof(*s)) : NULL;
-    if (!s) {
-        free(text);
-        return oom(&c->err);
-    }
+ollama_stream_t *stream_new(stream_kind_t kind) {
+    ollama_stream_t *s = calloc(1, sizeof(*s));
+    if (!s) return NULL;
     s->kind = kind;
     err_init(&s->err);
     if (kind == STREAM_CHAT) {
         s->message.role = "assistant";
         s->message.content = "";
+    }
+    return s;
+}
+
+static ollama_status_t open_stream(ollama_client_t *c, const char *path, ollama_json_t *body, stream_kind_t kind,
+                                   ollama_stream_t **out) {
+    char *text = ollama_json_stringify(body);
+    ollama_json_free(body);
+    ollama_stream_t *s = text ? stream_new(kind) : NULL;
+    if (!s) {
+        free(text);
+        return oom(&c->err);
     }
     ollama_status_t st = http_stream_start(c, path, text, s);
     if (st != OLLAMA_OK) {
@@ -389,9 +395,12 @@ ollama_status_t ollama_create_stream(ollama_client_t *client, const ollama_creat
 }
 
 /* Adds a chat part to the message assembled by the stream. */
-static bool accumulate(ollama_stream_t *s, const ollama_chat_response_t *part) {
+static bool add_part(ollama_stream_t *s, const ollama_chat_response_t *part) {
     const ollama_message_t *m = &part->message;
-    if (!s->role && m->role && *m->role && !(s->role = ol_strdup(m->role))) return false;
+    if (!s->role && m->role && *m->role) {
+        s->role = ol_strdup(m->role);
+        if (!s->role) return false;
+    }
     if (m->content && !buf_puts(&s->content, m->content)) return false;
     if (m->thinking && !buf_puts(&s->thinking, m->thinking)) return false;
     for (size_t i = 0; i < m->tool_calls_count; i++) {
@@ -405,14 +414,22 @@ static bool accumulate(ollama_stream_t *s, const ollama_chat_response_t *part) {
         if (!tool_call_copy(&s->tool_calls[s->tool_calls_count], &m->tool_calls[i])) return false;
         s->tool_calls_count++;
     }
-    const char *content = buf_cstr(&s->content);
-    if (!content) return false;
+    return true;
+}
+
+/*
+ * Adds a part and points the assembled message at the buffers, which may have
+ * moved, even when the part could only be added partially: a failed append
+ * leaves a buffer as it was, so the message is then incomplete but valid.
+ */
+static bool accumulate(ollama_stream_t *s, const ollama_chat_response_t *part) {
+    bool ok = add_part(s, part);
     s->message.role = s->role ? s->role : "assistant";
-    s->message.content = content;
-    s->message.thinking = s->thinking.len ? buf_cstr(&s->thinking) : NULL;
+    s->message.content = s->content.data ? s->content.data : "";
+    s->message.thinking = s->thinking.len ? s->thinking.data : NULL;
     s->message.tool_calls = s->tool_calls;
     s->message.tool_calls_count = s->tool_calls_count;
-    return true;
+    return ok;
 }
 
 static void *stream_next(ollama_stream_t *s, stream_kind_t kind) {

@@ -1,0 +1,33 @@
+# Doxygen configuration of the API reference. CMake fills in the @...@ values:
+#   cmake --build build --target docs   ->   build/docs/html/index.html
+PROJECT_NAME           = "Ollama-C"
+PROJECT_NUMBER         = @PROJECT_VERSION@
+PROJECT_BRIEF          = "C client library for Ollama, a port of ollama-python"
+OUTPUT_DIRECTORY       = "@CMAKE_CURRENT_BINARY_DIR@/docs"
+
+INPUT                  = include/ollama.h README.md
+USE_MDFILE_AS_MAINPAGE = README.md
+FULL_PATH_NAMES        = YES
+STRIP_FROM_PATH        = "@CMAKE_CURRENT_SOURCE_DIR@"
+OPTIMIZE_OUTPUT_FOR_C  = YES
+TYPEDEF_HIDES_STRUCT   = YES
+SORT_MEMBER_DOCS       = NO
+JAVADOC_AUTOBRIEF      = YES
+
+# the API must be documented completely: any warning fails the build
+WARN_IF_UNDOCUMENTED   = YES
+WARN_IF_DOC_ERROR      = YES
+WARN_IF_INCOMPLETE_DOC = YES
+WARN_NO_PARAMDOC       = YES
+WARN_AS_ERROR          = FAIL_ON_WARNINGS
+QUIET                  = YES
+
+ENABLE_PREPROCESSING   = YES
+MACRO_EXPANSION        = YES
+EXPAND_ONLY_PREDEF     = YES
+PREDEFINED             = OLLAMA_API=
+
+GENERATE_HTML          = YES
+GENERATE_LATEX         = NO
+GENERATE_TREEVIEW      = YES
+HAVE_DOT               = NO

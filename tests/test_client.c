@@ -199,6 +199,10 @@ static void test_connection_error(void) {
     CHECK(ollama_generate_stream(offline, &req, &stream) == OLLAMA_ERROR_CONNECTION);
     CHECK(stream == NULL);
     ollama_client_free(offline);
+
+    /* hosts that the Python client rejects with a ValueError */
+    CHECK(ollama_client_new("[::1") == NULL);
+    CHECK(ollama_client_new("example.com:99999") == NULL);
 }
 
 static void test_chat(void) {

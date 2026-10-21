@@ -1,6 +1,7 @@
 /* HTTP transport on top of libcurl: blocking requests and NDJSON streams. */
 #include "internal.h"
 
+#include <limits.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -74,7 +75,11 @@ static ollama_status_t setup(CURL *h, const ollama_client_t *c, const http_reque
     if (c->timeout_ms > 0) {
         curl_easy_setopt(h, CURLOPT_CONNECTTIMEOUT_MS, c->timeout_ms);
         curl_easy_setopt(h, CURLOPT_LOW_SPEED_LIMIT, 1L);
-        curl_easy_setopt(h, CURLOPT_LOW_SPEED_TIME, (c->timeout_ms + 999) / 1000);
+        /* seconds, rounded up without overflowing a 32-bit long (Windows); libcurl
+         * before 8.19 multiplies this value by 1000 in a long */
+        long seconds = c->timeout_ms / 1000 + (c->timeout_ms % 1000 != 0);
+        if (seconds > LONG_MAX / 1000) seconds = LONG_MAX / 1000;
+        curl_easy_setopt(h, CURLOPT_LOW_SPEED_TIME, seconds);
     }
 
     if (strcmp(r->method, "GET") == 0) {
@@ -192,7 +197,8 @@ int http_stream_line(ollama_stream_t *s, const char **line, size_t *len) {
             err_set(&s->err, OLLAMA_ERROR_MEMORY, -1, "out of memory");
             return -1;
         }
-        char *start = s->data.data + s->pos;
+        /* the buffer is still NULL when nothing has been received */
+        char *start = s->data.data ? s->data.data + s->pos : NULL;
         size_t avail = s->data.len - s->pos;
         char *nl = avail ? memchr(start, '\n', avail) : NULL;
         if (!nl && s->finished) {
