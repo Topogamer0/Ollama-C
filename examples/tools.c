@@ -6,8 +6,8 @@
 #include <stdio.h>
 #include <string.h>
 
-static long add_two_numbers(long a, long b) { return a + b; }
-static long subtract_two_numbers(long a, long b) { return a - b; }
+static long long add_two_numbers(long long a, long long b) { return a + b; }
+static long long subtract_two_numbers(long long a, long long b) { return a - b; }
 
 static ollama_json_t *number_tool(const char *name, const char *description) {
     ollama_json_t *tool = ollama_tool_new(name, description);
@@ -41,17 +41,17 @@ int main(void) {
         ollama_messages_add_message(messages, &res->message);
         for (size_t i = 0; i < res->message.tool_calls_count; i++) {
             const ollama_tool_call_t *call = &res->message.tool_calls[i];
-            long a = (long)ollama_json_as_int(ollama_json_get(call->function.arguments, "a"));
-            long b = (long)ollama_json_as_int(ollama_json_get(call->function.arguments, "b"));
+            long long a = ollama_json_as_int(ollama_json_get(call->function.arguments, "a"));
+            long long b = ollama_json_as_int(ollama_json_get(call->function.arguments, "b"));
             char *args = ollama_json_stringify(call->function.arguments);
             printf("Calling function: %s\nArguments: %s\n", call->function.name, args);
             ollama_free(args);
 
             char output[64];
             if (strcmp(call->function.name, "add_two_numbers") == 0)
-                snprintf(output, sizeof(output), "%ld", add_two_numbers(a, b));
+                snprintf(output, sizeof(output), "%lld", add_two_numbers(a, b));
             else if (strcmp(call->function.name, "subtract_two_numbers") == 0)
-                snprintf(output, sizeof(output), "%ld", subtract_two_numbers(a, b));
+                snprintf(output, sizeof(output), "%lld", subtract_two_numbers(a, b));
             else
                 snprintf(output, sizeof(output), "unknown function");
             printf("Function output: %s\n", output);

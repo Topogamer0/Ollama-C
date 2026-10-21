@@ -76,13 +76,22 @@ static bool valid_ipv6(const char *s, size_t n) {
     return compressed ? groups <= 7 : groups == 8;
 }
 
-/* What urlsplit() accepts between brackets: an IPv6 address or an IPvFuture literal. */
+/*
+ * What urlsplit() accepts between brackets: an IPv6 address or an IPvFuture
+ * literal. Python takes any character after "v<hex>."; RFC 3986 only allows
+ * unreserved characters, sub-delims and ':', which keeps the URL parseable.
+ */
 static bool valid_bracketed_host(const char *s, size_t n) {
     if (n > 0 && s[0] == 'v') {
         size_t i = 1;
         while (i < n && is_hex(s[i])) i++;
         if (i == 1 || i >= n || s[i] != '.' || i + 1 >= n) return false;
-        return memchr(s, '\n', n) == NULL;
+        for (i++; i < n; i++) {
+            char c = s[i];
+            bool alnum = is_digit(c) || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+            if (!alnum && !strchr("-._~!$&'()*+,;=:", c)) return false;
+        }
+        return true;
     }
     return valid_ipv6(s, n);
 }

@@ -22,6 +22,12 @@ option(OLLAMA_WERROR "Treat compiler warnings as errors" OFF)
 
 find_package(CURL REQUIRED)
 
+# Windows has no rpath: put the DLL, the tests and the examples in one directory
+# so that they find ollama.dll and the libcurl DLLs copied there by vcpkg.
+if(OLLAMA_TOP_LEVEL AND WIN32 AND NOT CMAKE_RUNTIME_OUTPUT_DIRECTORY)
+    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/bin)
+endif()
+
 set(OLLAMA_SOURCES
     src/api.c
     src/client.c
@@ -48,6 +54,13 @@ if(MSVC)
     set(OLLAMA_WARNINGS /W4 /utf-8 /external:anglebrackets /external:W0)
     if(OLLAMA_WERROR)
         list(APPEND OLLAMA_WARNINGS /WX)
+    endif()
+    # CMake 3.21+ passes /std:c11 for C_STANDARD 11; add it with older versions, and
+    # silence the C99 initializer warnings on compilers that predate it
+    if(MSVC_VERSION LESS 1928)
+        list(APPEND OLLAMA_WARNINGS /wd4204 /wd4221)
+    elseif(CMAKE_VERSION VERSION_LESS 3.21)
+        list(APPEND OLLAMA_WARNINGS /std:c11)
     endif()
     # fopen(), getenv() and the like are standard C, not "unsafe" functions
     add_compile_definitions(_CRT_SECURE_NO_WARNINGS)
@@ -142,6 +155,13 @@ if(OLLAMA_INSTALL)
     else()
         set(OLLAMA_PC_REQUIRES "Requires")
     endif()
+    foreach(dir LIBDIR INCLUDEDIR)
+        if(IS_ABSOLUTE "${CMAKE_INSTALL_${dir}}")
+            set(OLLAMA_PC_${dir} "${CMAKE_INSTALL_${dir}}")
+        else()
+            set(OLLAMA_PC_${dir} "\${prefix}/${CMAKE_INSTALL_${dir}}")
+        endif()
+    endforeach()
     configure_file(ollama-c.pc.in ${CMAKE_CURRENT_BINARY_DIR}/ollama-c.pc @ONLY)
     install(FILES ${CMAKE_CURRENT_BINARY_DIR}/ollama-c.pc DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
 endif()

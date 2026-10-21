@@ -30,7 +30,9 @@
  * - Responses are allocated by the library and released with ollama_response_free().
  *   Their strings and arrays live as long as the response itself (see @ref responses).
  * - Optional string fields are NULL when absent. Optional numbers are 0 when absent.
- * - Strings are NUL-terminated UTF-8; the library does not validate the encoding.
+ * - Strings are NUL-terminated UTF-8; the library does not validate the encoding. File paths are
+ *   the exception: they are passed to fopen() unchanged, so on Windows they are in the active code
+ *   page, like the arguments of main().
  */
 #ifndef OLLAMA_H
 #define OLLAMA_H
@@ -649,7 +651,8 @@ OLLAMA_API void ollama_cleanup(void);
  * @endcode
  */
 typedef struct ollama_image {
-    /** Path of an image file, read and base64-encoded by the library (#OLLAMA_ERROR_IO if it cannot be read). */
+    /** Path of an image file, read and base64-encoded by the library (#OLLAMA_ERROR_IO if it cannot be
+     *  read). It is passed to fopen(): on Windows it is in the active code page. */
     const char *path;
     const void *data;   ///< Raw image bytes, base64-encoded by the library.
     size_t size;        ///< Size of `data` in bytes.
@@ -1340,7 +1343,7 @@ OLLAMA_API ollama_status_t ollama_create(ollama_client_t *client, const ollama_c
  * @endcode
  *
  * @param[in] client the client, or NULL for the default client
- * @param[in] path path of the file to upload
+ * @param[in] path path of the file to upload, passed to fopen() (on Windows, in the active code page)
  * @param[out] digest receives the digest of the file, "sha256:" followed by 64 lowercase
  *             hexadecimal digits, to release with ollama_free(); NULL on failure
  * @return #OLLAMA_OK on success. Otherwise #OLLAMA_ERROR_REQUEST if @p path or @p digest is NULL;

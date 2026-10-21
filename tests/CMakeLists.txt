@@ -42,11 +42,6 @@ find_package(Python3 COMPONENTS Interpreter)
 if(Python3_Interpreter_FOUND)
     add_test(NAME client
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/mock_server.py $<TARGET_FILE:test_client>)
-    if(WIN32 AND BUILD_SHARED_LIBS AND NOT CMAKE_VERSION VERSION_LESS 3.22)
-        # Windows finds DLLs through PATH, not through an rpath
-        set_tests_properties(client PROPERTIES
-            ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:ollama>")
-    endif()
 else()
     message(STATUS "Python 3 not found: the client integration test is disabled")
 endif()

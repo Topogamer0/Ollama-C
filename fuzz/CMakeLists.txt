@@ -3,8 +3,18 @@
 #   cmake --build build-fuzz --target fuzz_json fuzz_host
 #   mkdir -p build-fuzz/corpus
 #   ./build-fuzz/fuzz/fuzz_json -dict=fuzz/json.dict build-fuzz/corpus fuzz/corpus/json
-if(NOT CMAKE_C_COMPILER_ID MATCHES "Clang")
-    message(FATAL_ERROR "OLLAMA_BUILD_FUZZERS requires Clang and libFuzzer")
+include(CheckCSourceCompiles)
+set(CMAKE_REQUIRED_FLAGS -fsanitize=fuzzer)
+set(CMAKE_REQUIRED_LINK_OPTIONS -fsanitize=fuzzer)
+check_c_source_compiles("
+#include <stddef.h>
+#include <stdint.h>
+int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) { (void)data; (void)size; return 0; }"
+    OLLAMA_HAVE_LIBFUZZER)
+unset(CMAKE_REQUIRED_FLAGS)
+unset(CMAKE_REQUIRED_LINK_OPTIONS)
+if(NOT OLLAMA_HAVE_LIBFUZZER)
+    message(FATAL_ERROR "OLLAMA_BUILD_FUZZERS requires Clang with libFuzzer (-fsanitize=fuzzer)")
 endif()
 
 list(TRANSFORM OLLAMA_SOURCES PREPEND ${PROJECT_SOURCE_DIR}/ OUTPUT_VARIABLE OLLAMA_FUZZ_SOURCES)

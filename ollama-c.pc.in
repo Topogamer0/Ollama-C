@@ -1,7 +1,7 @@
 prefix=@OLLAMA_PC_PREFIX@
 exec_prefix=${prefix}
-libdir=${prefix}/@CMAKE_INSTALL_LIBDIR@
-includedir=${prefix}/@CMAKE_INSTALL_INCLUDEDIR@
+libdir=@OLLAMA_PC_LIBDIR@
+includedir=@OLLAMA_PC_INCLUDEDIR@
 
 Name: ollama-c
 Description: @PROJECT_DESCRIPTION@

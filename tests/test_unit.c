@@ -64,6 +64,7 @@ static void test_parse_host(void) {
     check_host("[fe80::1%eth0]", "http://[fe80::1%eth0]:11434");
     check_host("[1:2:3:4:5:6:7::]", "http://[1:2:3:4:5:6:7::]:11434");
     check_host("[v1.fe]", "http://v1.fe:11434");
+    check_host("[v1.a:b]", "http://[v1.a:b]:11434");
 
     /* rejected like the Python client does (ValueError from urlsplit) */
     check_invalid_host("[::1");
@@ -81,6 +82,9 @@ static void test_parse_host(void) {
     /* found by fuzz_host: valid brackets in the user info, broken ones in the host */
     check_invalid_host("https://user:pw@E[::1]:0@::][1E:p?q#f");
     check_host("[::1]@example.com", "http://example.com:11434");
+    /* found by fuzz_host: IPvFuture literals with characters that RFC 3986 does not allow */
+    check_invalid_host("[v1.[v]");
+    check_invalid_host("[v4.a b]");
 }
 
 /* ---- JSON ---- */

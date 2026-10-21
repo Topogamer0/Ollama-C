@@ -76,7 +76,11 @@ ctest --test-dir build -C Release
 ```
 
 With MSVC, compile your own code with `/std:c11` or later: in its default mode `/W4` warns about the
-designated initializers used for requests (C4204, C4221), which are standard C99.
+designated initializers used for requests (C4204, C4221), which are standard C99. On Windows the
+executables of the build (tests and examples) are written to `build/bin/<config>`, next to the DLLs
+they need. Models answer in UTF-8: run `chcp 65001` in the console before the examples to see
+accented letters and emoji correctly. File paths (images, blobs) are passed to `fopen()`, so they
+are in the active code page, like the arguments of `main()`.
 
 Options: `-DBUILD_SHARED_LIBS=ON` for a shared library (a DLL on Windows),
 `-DOLLAMA_BUILD_EXAMPLES=OFF`, `-DOLLAMA_BUILD_TESTS=OFF`, `-DOLLAMA_WERROR=ON` to treat warnings as

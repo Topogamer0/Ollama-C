@@ -182,7 +182,7 @@ ollama_status_t ollama_create_blob(ollama_client_t *client, const char *path, ch
         st = oom(&c->err);
     }
     fclose(f);
-    if (st == OLLAMA_OK && !(*digest = ol_strdup(hex))) st = oom(&c->err);
+    if (st == OLLAMA_OK && (*digest = ol_strdup(hex)) == NULL) st = oom(&c->err);
     return st;
 }
 
