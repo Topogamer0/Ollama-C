@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size);
 
@@ -33,12 +34,17 @@ int main(int argc, char **argv) {
             }
         }
         fclose(f);
-        if (!data) {
+        /* an exact-size copy, like libFuzzer, so that ASan sees reads past the end */
+        uint8_t *exact = data ? malloc(size ? size : 1) : NULL;
+        if (!exact) {
+            free(data);
             fprintf(stderr, "out of memory reading %s\n", argv[i]);
             return 1;
         }
-        LLVMFuzzerTestOneInput(data, size);
+        memcpy(exact, data, size);
         free(data);
+        LLVMFuzzerTestOneInput(exact, size);
+        free(exact);
     }
     printf("%d inputs replayed\n", argc - 1);
     return 0;

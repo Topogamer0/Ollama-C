@@ -38,10 +38,20 @@ target_link_libraries(test_client PRIVATE ollama::ollama CURL::libcurl)
 target_compile_options(test_client PRIVATE ${OLLAMA_WARNINGS})
 set_target_properties(test_client PROPERTIES C_STANDARD ${OLLAMA_C_STANDARD} C_EXTENSIONS OFF)
 
+# The host parser compared with the Python client (tests/host_parity.py).
+add_executable(host_cli host_cli.c ${OLLAMA_TEST_SOURCES})
+target_include_directories(host_cli PRIVATE ${PROJECT_SOURCE_DIR}/include ${PROJECT_SOURCE_DIR}/src)
+target_link_libraries(host_cli PRIVATE CURL::libcurl)
+target_compile_options(host_cli PRIVATE ${OLLAMA_WARNINGS})
+set_target_properties(host_cli PROPERTIES C_STANDARD ${OLLAMA_C_STANDARD} C_EXTENSIONS OFF)
+
 find_package(Python3 COMPONENTS Interpreter)
 if(Python3_Interpreter_FOUND)
     add_test(NAME client
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/mock_server.py $<TARGET_FILE:test_client>)
+    add_test(NAME host_parity
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/host_parity.py $<TARGET_FILE:host_cli>)
+    set_tests_properties(host_parity PROPERTIES SKIP_RETURN_CODE 77)
 else()
     message(STATUS "Python 3 not found: the client integration test is disabled")
 endif()

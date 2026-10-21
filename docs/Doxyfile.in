@@ -3,12 +3,12 @@
 PROJECT_NAME           = "Ollama-C"
 PROJECT_NUMBER         = @PROJECT_VERSION@
 PROJECT_BRIEF          = "C client library for Ollama, a port of ollama-python"
-OUTPUT_DIRECTORY       = @CMAKE_CURRENT_BINARY_DIR@/docs
+OUTPUT_DIRECTORY       = "@CMAKE_CURRENT_BINARY_DIR@/docs"
 
-INPUT                  = include/ollama.h README.md CHANGELOG.md
+INPUT                  = include/ollama.h README.md
 USE_MDFILE_AS_MAINPAGE = README.md
 FULL_PATH_NAMES        = YES
-STRIP_FROM_PATH        = @CMAKE_CURRENT_SOURCE_DIR@
+STRIP_FROM_PATH        = "@CMAKE_CURRENT_SOURCE_DIR@"
 OPTIMIZE_OUTPUT_FOR_C  = YES
 TYPEDEF_HIDES_STRUCT   = YES
 SORT_MEMBER_DOCS       = NO

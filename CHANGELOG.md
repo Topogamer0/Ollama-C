@@ -25,10 +25,15 @@ removed.
 
 ### Changed
 
-- `ollama_client_new()` returns `NULL` for a host that the Python client rejects with a
-  `ValueError` (unbalanced or invalid brackets, ports that are not numbers up to 65535), instead
-  of building an invalid URL. IPvFuture literals (`[v1.x]`) must use the characters allowed by
-  RFC 3986. With the default client (`NULL`), the functions return `OLLAMA_ERROR_REQUEST` and
+- `OLLAMA_HOST` is parsed like current Python versions (3.11+) do: `ollama_client_new()` returns
+  `NULL` for a host that Python rejects with a `ValueError` (unbalanced brackets, data around the
+  brackets, an invalid address between brackets, a port that is not a number up to 65535) instead
+  of building an invalid URL; tabs and newlines are ignored, so a host read from a CRLF `.env` file
+  works; the zone of a scoped IPv6 address keeps its case; ports with leading zeros (`:000080`) are
+  used instead of being ignored. IPvFuture literals (`[v1.x]`) must use the characters allowed by
+  RFC 3986. `tests/host_parity.py` compares the parser with the Python client.
+- With the default client (`NULL`), an invalid `OLLAMA_HOST`, or an `OLLAMA_API_KEY` containing CR
+  or LF, now gives `OLLAMA_ERROR_REQUEST` (instead of `OLLAMA_ERROR_MEMORY`), and
   `ollama_last_error(NULL)` explains the problem.
 - On Windows the executables of the build (tests, examples) are written to `build/bin/<config>`,
   next to `ollama.dll` and the libcurl DLLs.
@@ -41,15 +46,12 @@ removed.
   empty body. Found by fuzzing.
 - JSON: negative zero lost its sign after a round trip (`-0.0` was written as `-0` and read back
   as the integer `0`). Found by fuzzing.
-- `OLLAMA_HOST`: hosts with unbalanced brackets, with broken brackets after valid ones in the user
-  information, or with IPvFuture literals containing delimiters produced a URL that changed when
-  parsed again. Found by fuzzing.
+- `OLLAMA_HOST`: hosts with unbalanced brackets, or with IPvFuture literals containing delimiters,
+  produced a URL that changed when parsed again. Found by fuzzing.
 - Chat streams: when a part made the assembled content grow and a later append ran out of memory,
   `ollama_stream_message()` pointed to freed memory. Found while reviewing the documentation.
-- Windows: shared builds could not start the examples (`ollama.dll` not found); the read timeout
-  overflowed a 32-bit `long` for very large values.
+- Windows: the read timeout overflowed a 32-bit `long` for very large values.
 - pkg-config: wrong `libdir`/`includedir` when the install directories are absolute.
-- With CMake older than 3.21, MSVC did not get `/std:c11`.
 - Windows: `src/json.c` did not compile because a local variable named `small` collided with the
   `small` macro of the Windows headers (`rpcndr.h`, included through `curl.h`); the library now
   includes the Windows headers with `WIN32_LEAN_AND_MEAN` and `NOMINMAX`.

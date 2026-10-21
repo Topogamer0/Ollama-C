@@ -53,6 +53,8 @@ int main(void) {
 
 Any other system with a C99 compiler, CMake 3.14+ and libcurl 7.28+ should work (for example
 FreeBSD or MinGW), but it is not tested. On Windows, Visual Studio 2019 16.10 or later is needed.
+The commands below use `ctest --test-dir` and `cmake --install`, which need CMake 3.20 and 3.15;
+with older versions run `ctest` from the build directory and `cmake --build build --target install`.
 
 ## Building
 
@@ -203,7 +205,7 @@ for (size_t i = 0; i < res->message.tool_calls_count; i++) {
 ```
 
 Tools can also be written as JSON with `ollama_json_parse()`. See
-[`examples/tools.c`](examples/tools.c) for the full round trip.
+[`examples/tools.c`](https://github.com/Topogamer0/Ollama-C/blob/main/examples/tools.c) for the full round trip.
 
 ### Structured outputs, images, embeddings
 
@@ -258,7 +260,7 @@ The default client (`NULL`) is not thread-safe. In multi-threaded programs call
 
 ## Examples
 
-The [`examples`](examples) directory mirrors the examples of ollama-python and is built with the
+The [`examples`](https://github.com/Topogamer0/Ollama-C/tree/main/examples) directory mirrors the examples of ollama-python and is built with the
 library (`build/examples/`): `generate`, `generate-stream`, `chat`, `chat-stream`,
 `chat-with-history`, `tools`, `structured-outputs`, `thinking`, `multimodal`, `embed`, `list`,
 `show`, `ps`, `pull`, `create`, `web-search`.
@@ -271,13 +273,13 @@ ollama pull gemma3
 ## Tests
 
 `ctest --test-dir build` runs the unit tests and the integration tests, which drive the public API
-against a fake Ollama server ([`tests/mock_server.py`](tests/mock_server.py)) and check both the
+against a fake Ollama server ([`tests/mock_server.py`](https://github.com/Topogamer0/Ollama-C/blob/main/tests/mock_server.py)) and check both the
 requests sent and the parsing of the answers.
 
 The JSON parser, the response parsers (regular and streaming) and the `OLLAMA_HOST` parser are
 fuzzed with libFuzzer, AddressSanitizer and UndefinedBehaviorSanitizer, starting from a corpus of
-real Ollama responses ([`fuzz/corpus`](fuzz/corpus)). The inputs of past crashes are kept in
-[`fuzz/regressions`](fuzz/regressions) and replayed by `ctest` on every platform:
+real Ollama responses ([`fuzz/corpus`](https://github.com/Topogamer0/Ollama-C/tree/main/fuzz/corpus)). The inputs of past crashes are kept in
+[`fuzz/regressions`](https://github.com/Topogamer0/Ollama-C/tree/main/fuzz/regressions) and replayed by `ctest` on every platform:
 
 ```sh
 CC=clang cmake -S . -B build-fuzz -DOLLAMA_BUILD_FUZZERS=ON
@@ -288,6 +290,6 @@ mkdir -p build-fuzz/corpus    # new inputs go to the first directory, the others
 
 ## License
 
-[MIT](LICENSE). The API, the host parsing rules and the error messages follow
+[MIT](https://github.com/Topogamer0/Ollama-C/blob/main/LICENSE). The API, the host parsing rules and the error messages follow
 [ollama-python](https://github.com/ollama/ollama-python), Copyright (c) Ollama, also released under
 the MIT License.

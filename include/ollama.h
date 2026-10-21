@@ -513,10 +513,13 @@ typedef struct ollama_client ollama_client_t;
  * @p host follows the rules of the Python library. When it is NULL or "", the OLLAMA_HOST
  * environment variable is used instead, and when that is unset or empty too, the local server.
  * The scheme defaults to http; the port defaults to 11434, or to 80 / 443 when an explicit
- * `http://` / `https://` scheme is given. The host name is lowercased, user information, query and
- * fragment are dropped, and a path is kept without its leading and trailing slashes. Like Python,
- * which raises ValueError, the client is not created when the host has unbalanced brackets or an
- * invalid address between brackets, or a port that is not a number up to 65535. For example:
+ * `http://` / `https://` scheme is given. Tabs and newlines are ignored, the host name is lowercased
+ * (up to the zone of a scoped IPv6 address), user information, query and fragment are dropped, and
+ * a path is kept without its leading and trailing slashes. Like current Python versions (3.11+),
+ * which raise ValueError, the client is not created when the host has unbalanced brackets, data
+ * around the brackets, an invalid address between brackets, or a port that is not a number up to
+ * 65535. IPvFuture literals (`[v1.x]`) must use the characters allowed by RFC 3986. For
+ * example:
  *
  * | `host`                                   | base URL                      |
  * | ---------------------------------------- | ----------------------------- |

@@ -81,7 +81,24 @@ static void test_parse_host(void) {
     check_invalid_host("[\xff[\xff]:\xff/]:\xff/");
     /* found by fuzz_host: valid brackets in the user info, broken ones in the host */
     check_invalid_host("https://user:pw@E[::1]:0@::][1E:p?q#f");
-    check_host("[::1]@example.com", "http://example.com:11434");
+    /* the rules of current CPython (3.11+), which check the part after the last '@' */
+    check_host("http://user:p[w@[::1]:11434", "http://[::1]:11434");
+    check_host("u[x]@[::1]", "http://[::1]:11434");
+    check_host("u]@[::1", "http://[::1]:11434");
+    check_host("[x]@v1.abc:80", "http://v1.abc:80");
+    check_invalid_host("[::1]@example.com");
+    check_invalid_host("x[::1]");
+    check_invalid_host("[::1]x:80");
+    check_invalid_host("[::1]]");
+    check_invalid_host("[::1]:80@x");
+    /* tabs and newlines are ignored, like the CR of a CRLF .env file */
+    check_host("192.168.1.10:11434\r", "http://192.168.1.10:11434");
+    check_host("http://localhost:11434\r\n", "http://localhost:11434");
+    check_host("local\thost", "http://localhost:11434");
+    check_host("[::1]:11434\r", "http://[::1]:11434");
+    /* the zone of a scoped address keeps its case, IPvFuture accepts V */
+    check_host("[fe80::1%Eth0]", "http://[fe80::1%Eth0]:11434");
+    check_host("[V1.abc]:8080", "http://v1.abc:8080");
     /* found by fuzz_host: IPvFuture literals with characters that RFC 3986 does not allow */
     check_invalid_host("[v1.[v]");
     check_invalid_host("[v4.a b]");
