@@ -1,0 +1,11 @@
+prefix=@OLLAMA_PC_PREFIX@
+exec_prefix=${prefix}
+libdir=${prefix}/@CMAKE_INSTALL_LIBDIR@
+includedir=${prefix}/@CMAKE_INSTALL_INCLUDEDIR@
+
+Name: ollama-c
+Description: @PROJECT_DESCRIPTION@
+Version: @PROJECT_VERSION@
+@OLLAMA_PC_REQUIRES@: libcurl
+Libs: -L${libdir} -lollama
+Cflags: -I${includedir}
