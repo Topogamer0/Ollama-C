@@ -27,8 +27,11 @@ removed.
 
 - `ollama_client_new()` returns `NULL` for a host that the Python client rejects with a
   `ValueError` (unbalanced or invalid brackets, ports that are not numbers up to 65535), instead
-  of building an invalid URL. With the default client (`NULL`), the functions return
-  `OLLAMA_ERROR_REQUEST` and `ollama_last_error(NULL)` explains the problem.
+  of building an invalid URL. IPvFuture literals (`[v1.x]`) must use the characters allowed by
+  RFC 3986. With the default client (`NULL`), the functions return `OLLAMA_ERROR_REQUEST` and
+  `ollama_last_error(NULL)` explains the problem.
+- On Windows the executables of the build (tests, examples) are written to `build/bin/<config>`,
+  next to `ollama.dll` and the libcurl DLLs.
 - The CMake package is compatible with any 0.x version from 0.1 (`SameMajorVersion`).
 - CI runners are pinned (`ubuntu-24.04`, `macos-15`, `windows-2025`) and use `actions/checkout@v5`.
 
@@ -38,8 +41,15 @@ removed.
   empty body. Found by fuzzing.
 - JSON: negative zero lost its sign after a round trip (`-0.0` was written as `-0` and read back
   as the integer `0`). Found by fuzzing.
-- `OLLAMA_HOST`: hosts with unbalanced brackets produced a URL that changed when parsed again.
-  Found by fuzzing.
+- `OLLAMA_HOST`: hosts with unbalanced brackets, with broken brackets after valid ones in the user
+  information, or with IPvFuture literals containing delimiters produced a URL that changed when
+  parsed again. Found by fuzzing.
+- Chat streams: when a part made the assembled content grow and a later append ran out of memory,
+  `ollama_stream_message()` pointed to freed memory. Found while reviewing the documentation.
+- Windows: shared builds could not start the examples (`ollama.dll` not found); the read timeout
+  overflowed a 32-bit `long` for very large values.
+- pkg-config: wrong `libdir`/`includedir` when the install directories are absolute.
+- With CMake older than 3.21, MSVC did not get `/std:c11`.
 - Windows: `src/json.c` did not compile because a local variable named `small` collided with the
   `small` macro of the Windows headers (`rpcndr.h`, included through `curl.h`); the library now
   includes the Windows headers with `WIN32_LEAN_AND_MEAN` and `NOMINMAX`.
