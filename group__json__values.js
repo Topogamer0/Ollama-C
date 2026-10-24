@@ -1,0 +1,38 @@
+var group__json__values =
+[
+    [ "ollama_json_t", "group__json__values.html#ga60948ffb1a455d08a379420b43972673", null ],
+    [ "ollama_json_type_t", "group__json__values.html#ga20151a89c69572d22f8aa34377d9b936", [
+      [ "OLLAMA_JSON_NULL", "group__json__values.html#gga20151a89c69572d22f8aa34377d9b936a6115ff7fe845018783dc19a425b246b7", null ],
+      [ "OLLAMA_JSON_BOOL", "group__json__values.html#gga20151a89c69572d22f8aa34377d9b936ad31ff05eb89733d47a6e938f3fb690fb", null ],
+      [ "OLLAMA_JSON_NUMBER", "group__json__values.html#gga20151a89c69572d22f8aa34377d9b936a160c3bbd4187d1d2d823bcd76e948b56", null ],
+      [ "OLLAMA_JSON_STRING", "group__json__values.html#gga20151a89c69572d22f8aa34377d9b936a299235de44793c99f1fde8f9ed09397d", null ],
+      [ "OLLAMA_JSON_ARRAY", "group__json__values.html#gga20151a89c69572d22f8aa34377d9b936a553d4cf4db2e9638f63783b52469739c", null ],
+      [ "OLLAMA_JSON_OBJECT", "group__json__values.html#gga20151a89c69572d22f8aa34377d9b936ae971428ee32bd6a622a143f47b58ee1c", null ]
+    ] ],
+    [ "ollama_json_parse", "group__json__values.html#gaaa7d5a010a425e03e5a6f19c712e2757", null ],
+    [ "ollama_json_stringify", "group__json__values.html#ga134a7445018b0ee32644394574d76e6a", null ],
+    [ "ollama_json_copy", "group__json__values.html#ga294fe50b71c83d6979d65a42c3dd988d", null ],
+    [ "ollama_json_free", "group__json__values.html#ga433d9218e924fbfde9e11dc29363a1a1", null ],
+    [ "ollama_json_null", "group__json__values.html#ga10aab50f9641c44a74b75058f5b9e82a", null ],
+    [ "ollama_json_bool", "group__json__values.html#ga165691c5afcf30dda64624dce90be1a2", null ],
+    [ "ollama_json_number", "group__json__values.html#gaf5040e2e4cfaafc99d629ee369783891", null ],
+    [ "ollama_json_int", "group__json__values.html#ga259baaa59000510ad973ef5397fef4ea", null ],
+    [ "ollama_json_string", "group__json__values.html#ga329cf25338880f6126c280021be2f5e1", null ],
+    [ "ollama_json_array", "group__json__values.html#gaa8bd2e01692075207b4b03bfdf4c6628", null ],
+    [ "ollama_json_object", "group__json__values.html#ga45d245097373ca36f9dcc6b6b915ba3b", null ],
+    [ "ollama_json_append", "group__json__values.html#ga805fa9d7aa5c7ca3cc5911d5bb31f3ba", null ],
+    [ "ollama_json_set", "group__json__values.html#gae1bea5f0188b78fbaa91c09b49c322a9", null ],
+    [ "ollama_json_set_string", "group__json__values.html#gab26591a3e472116880f7f9745f81f398", null ],
+    [ "ollama_json_set_number", "group__json__values.html#ga8290713bd84569964a395394e2045588", null ],
+    [ "ollama_json_set_int", "group__json__values.html#gaa430b8e0f13a748cdd1033ec12e88417", null ],
+    [ "ollama_json_set_bool", "group__json__values.html#gac7d2388aa88832d9858e02c0b17ae492", null ],
+    [ "ollama_json_type", "group__json__values.html#ga6fa01237772e1c2c21ceeaa11c96e994", null ],
+    [ "ollama_json_get", "group__json__values.html#ga696ce237b379e6ebdc6d86530360995f", null ],
+    [ "ollama_json_size", "group__json__values.html#ga728c2d089922d705be0d8f2224114834", null ],
+    [ "ollama_json_at", "group__json__values.html#ga426276557c571f10062cf32fb407a164", null ],
+    [ "ollama_json_key_at", "group__json__values.html#ga8d6d39b75701f16e2e76c28e3ba1f938", null ],
+    [ "ollama_json_as_string", "group__json__values.html#ga64c40bbf5fcd7a794646a067e72513ee", null ],
+    [ "ollama_json_as_number", "group__json__values.html#ga41c55b6400a72b920be67c2dbe668c32", null ],
+    [ "ollama_json_as_int", "group__json__values.html#ga1d9c198d969a844aa893a5319b833af9", null ],
+    [ "ollama_json_as_bool", "group__json__values.html#ga9776bd7d015649e2baecbd268735d1eb", null ]
+];

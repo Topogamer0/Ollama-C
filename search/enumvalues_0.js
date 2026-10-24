@@ -1,0 +1,20 @@
+var searchData=
+[
+  ['ollama_5fdefault_0',['OLLAMA_DEFAULT',['../group__requests.html#ggac6b77b25fd07a638eaea8b3c95ca64e7aeb05a195b77880a48467fe9dfd3a6dea',1,'ollama.h']]],
+  ['ollama_5ferror_5fconnection_1',['OLLAMA_ERROR_CONNECTION',['../group__errors.html#ggac2991d7a472416e03bf29a2a958b7fc6a538d182bdd20d6381c9da2db88fbb7f4',1,'ollama.h']]],
+  ['ollama_5ferror_5fio_2',['OLLAMA_ERROR_IO',['../group__errors.html#ggac2991d7a472416e03bf29a2a958b7fc6a644f4b71c5d410a17cfc1dc9cd42c3d4',1,'ollama.h']]],
+  ['ollama_5ferror_5fmemory_3',['OLLAMA_ERROR_MEMORY',['../group__errors.html#ggac2991d7a472416e03bf29a2a958b7fc6af00dec78a1f0c84be3ff31f0c1706c29',1,'ollama.h']]],
+  ['ollama_5ferror_5fparse_4',['OLLAMA_ERROR_PARSE',['../group__errors.html#ggac2991d7a472416e03bf29a2a958b7fc6a8b587c7681512e883aad4e6231f59118',1,'ollama.h']]],
+  ['ollama_5ferror_5frequest_5',['OLLAMA_ERROR_REQUEST',['../group__errors.html#ggac2991d7a472416e03bf29a2a958b7fc6a4c3c5b04f9d756c896b1883620259adb',1,'ollama.h']]],
+  ['ollama_5ferror_5fresponse_6',['OLLAMA_ERROR_RESPONSE',['../group__errors.html#ggac2991d7a472416e03bf29a2a958b7fc6a923829731c44cbf2a1c721b6b3e84ede',1,'ollama.h']]],
+  ['ollama_5ferror_5ftransport_7',['OLLAMA_ERROR_TRANSPORT',['../group__errors.html#ggac2991d7a472416e03bf29a2a958b7fc6aa6d39d984840620aace515d74c8879af',1,'ollama.h']]],
+  ['ollama_5ffalse_8',['OLLAMA_FALSE',['../group__requests.html#ggac6b77b25fd07a638eaea8b3c95ca64e7ab546b83b05e1c15df6aaa3b19cbc0782',1,'ollama.h']]],
+  ['ollama_5fjson_5farray_9',['OLLAMA_JSON_ARRAY',['../group__json__values.html#gga20151a89c69572d22f8aa34377d9b936a553d4cf4db2e9638f63783b52469739c',1,'ollama.h']]],
+  ['ollama_5fjson_5fbool_10',['OLLAMA_JSON_BOOL',['../group__json__values.html#gga20151a89c69572d22f8aa34377d9b936ad31ff05eb89733d47a6e938f3fb690fb',1,'ollama.h']]],
+  ['ollama_5fjson_5fnull_11',['OLLAMA_JSON_NULL',['../group__json__values.html#gga20151a89c69572d22f8aa34377d9b936a6115ff7fe845018783dc19a425b246b7',1,'ollama.h']]],
+  ['ollama_5fjson_5fnumber_12',['OLLAMA_JSON_NUMBER',['../group__json__values.html#gga20151a89c69572d22f8aa34377d9b936a160c3bbd4187d1d2d823bcd76e948b56',1,'ollama.h']]],
+  ['ollama_5fjson_5fobject_13',['OLLAMA_JSON_OBJECT',['../group__json__values.html#gga20151a89c69572d22f8aa34377d9b936ae971428ee32bd6a622a143f47b58ee1c',1,'ollama.h']]],
+  ['ollama_5fjson_5fstring_14',['OLLAMA_JSON_STRING',['../group__json__values.html#gga20151a89c69572d22f8aa34377d9b936a299235de44793c99f1fde8f9ed09397d',1,'ollama.h']]],
+  ['ollama_5fok_15',['OLLAMA_OK',['../group__errors.html#ggac2991d7a472416e03bf29a2a958b7fc6a4c3c693a64758d1ff1f062e6d8db380a',1,'ollama.h']]],
+  ['ollama_5ftrue_16',['OLLAMA_TRUE',['../group__requests.html#ggac6b77b25fd07a638eaea8b3c95ca64e7aa1755818b76f32e98608498ea27a7230',1,'ollama.h']]]
+];
