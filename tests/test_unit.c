@@ -53,7 +53,6 @@ static void test_parse_host(void) {
     check_host("https://[0001:002:003:0004::1]:56789/path", "https://[0001:002:003:0004::1]:56789/path");
     check_host("[0001:002:003:0004::1]:56789/path/", "http://[0001:002:003:0004::1]:56789/path");
     /* beyond the doctests */
-    check_host("0.0.0.0", "http://0.0.0.0:11434");
     check_host("Example.COM", "http://example.com:11434");
     check_host("user:pass@example.com:1234", "http://example.com:1234");
     check_host("example.com:1234?x=1", "http://example.com:1234");
@@ -102,6 +101,41 @@ static void test_parse_host(void) {
     /* found by fuzz_host: IPvFuture literals with characters that RFC 3986 does not allow */
     check_invalid_host("[v1.[v]");
     check_invalid_host("[v4.a b]");
+
+    /* unspecified addresses, on which the server listens on every interface: like
+     * ConnectableHost() of the Ollama client in Go, connect to the loopback address */
+    check_host("0.0.0.0", "http://127.0.0.1:11434");
+    check_host("0.0.0.0:1234", "http://127.0.0.1:1234");
+    check_host("https://0.0.0.0:4321", "https://127.0.0.1:4321");
+    check_host("http://0.0.0.0", "http://127.0.0.1:80");
+    check_host("0.0.0.0/api/", "http://127.0.0.1:11434/api");
+    check_host("user@0.0.0.0:8080", "http://127.0.0.1:8080");
+    check_host("0.0.0.0:11434\r\n", "http://127.0.0.1:11434");
+    check_host("[::]", "http://[::1]:11434");
+    check_host("[::]:1234", "http://[::1]:1234");
+    check_host("https://[::]:4321/path", "https://[::1]:4321/path");
+    check_host("[0:0:0:0:0:0:0:0]", "http://[::1]:11434");
+    check_host("[0000::0.0.0.0]", "http://[::1]:11434");
+    check_host("[::ffff:0.0.0.0]:8", "http://127.0.0.1:8");
+    check_host("[::FFFF:0:0]", "http://127.0.0.1:11434");
+    check_host("::", "http://[::1]:11434");
+    check_host("http://::", "http://[::1]:80");
+    check_host("::/api", "http://[::1]:11434/api");
+    check_host("0::0", "http://[::1]:11434");
+    /* other addresses stay as they are */
+    check_host("[::1]", "http://[::1]:11434");
+    check_host("192.168.1.5:8080", "http://192.168.1.5:8080");
+    check_host("0.0.0.1", "http://0.0.0.1:11434");
+    check_host("00.0.0.0", "http://00.0.0.0:11434");
+    check_host("[::%eth0]", "http://[::%eth0]:11434");
+    check_host("[::ffff:0.0.0.1]", "http://[::ffff:0.0.0.1]:11434");
+    check_host("[::ffff:0:0:0]", "http://[::ffff:0:0:0]:11434");
+    check_host("[::0.0.0.1]", "http://[::0.0.0.1]:11434");
+    /* a bare IPv6 address is only accepted when it is unspecified, and cannot have a port */
+    check_invalid_host("::1");
+    check_invalid_host(":::1234");
+    check_invalid_host("::%eth0");
+    check_invalid_host("[x]@::");
 }
 
 /* ---- JSON ---- */

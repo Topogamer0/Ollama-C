@@ -205,6 +205,31 @@ static void test_connection_error(void) {
     CHECK(ollama_client_new("example.com:99999") == NULL);
 }
 
+static void test_unspecified_host(void) {
+    /* OLLAMA_HOST=0.0.0.0:<port> makes the server listen on every interface; the client must
+     * reach it on 127.0.0.1, which connecting to 0.0.0.0 does not do on Windows */
+    const char *port = strrchr(ollama_client_host(client), ':');
+    char host[64], expected[64];
+    snprintf(host, sizeof(host), "0.0.0.0%s", port);
+    snprintf(expected, sizeof(expected), "http://127.0.0.1%s", port);
+    ollama_client_t *any = ollama_client_new(host);
+    CHECK(any != NULL);
+    if (!any) return;
+    CHECK_STR(ollama_client_host(any), expected);
+    ollama_list_response_t *list = NULL;
+    CHECK(ollama_list(any, &list) == OLLAMA_OK);
+    if (list) CHECK(list->models_count == 2);
+    ollama_response_free(list);
+    ollama_client_free(any);
+
+    snprintf(host, sizeof(host), "[::]%s", port);
+    snprintf(expected, sizeof(expected), "http://[::1]%s", port);
+    any = ollama_client_new(host);
+    CHECK(any != NULL);
+    if (any) CHECK_STR(ollama_client_host(any), expected);
+    ollama_client_free(any);
+}
+
 static void test_chat(void) {
     ollama_messages_t *history = ollama_messages_new();
     ollama_messages_add(history, "system", "You are a helpful assistant.");
@@ -582,6 +607,7 @@ int main(void) {
     RUN(test_generate_stream);
     RUN(test_errors);
     RUN(test_connection_error);
+    RUN(test_unspecified_host);
     RUN(test_chat);
     RUN(test_chat_tools);
     RUN(test_chat_stream);

@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.14...3.31)
 
 project(ollama-c
-    VERSION 0.2.0
+    VERSION 0.2.1
     DESCRIPTION "C client library for Ollama, a port of ollama-python"
     LANGUAGES C)
 

@@ -4,6 +4,24 @@ All notable changes to this project are documented in this file. The format foll
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.2.1] - 2026-10-24
+
+### Added
+
+- Homebrew: `brew install topogamer0/tap/ollama-c` (see the README). A release workflow updates the
+  formula of the tap when a `v*` tag is pushed.
+
+### Fixed
+
+- `OLLAMA_HOST=0.0.0.0` (or `::`), the value that makes the Ollama server listen on every
+  interface, now works on every platform: like `ConnectableHost()` of the Ollama client in Go,
+  `ollama_client_new()` connects to `127.0.0.1` when the host is the unspecified IPv4 address and to
+  `::1` when it is the unspecified IPv6 address, keeping scheme, port and path (`0.0.0.0:1234`,
+  `https://0.0.0.0:4321`, `[::]`, `[::]:1234`, ...). It used to connect to `0.0.0.0`, which works
+  on Linux but fails on Windows. A bare `::` is now accepted like `[::]`. An address with a zone
+  (`[::%eth0]`) is kept as it is. ollama-python does not do this: `tests/host_parity.py` applies the
+  same rule to its results and finds no difference with the C client.
+
 ## [0.2.0] - 2026-10-21
 
 The public API is backward compatible with 0.1.0: no function, type or field was changed or
@@ -65,5 +83,6 @@ First release: a C99 port of ollama-python with `generate`, `chat`, `embed`, `em
 `web_fetch` and `systemone`, streaming iterators, a JSON API, chat history and tool helpers,
 CMake and pkg-config packages, examples and tests.
 
+[0.2.1]: https://github.com/Topogamer0/Ollama-C/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/Topogamer0/Ollama-C/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/Topogamer0/Ollama-C/releases/tag/v0.1.0
