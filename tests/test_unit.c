@@ -135,7 +135,9 @@ static void test_parse_host(void) {
     check_invalid_host("::1");
     check_invalid_host(":::1234");
     check_invalid_host("::%eth0");
-    check_invalid_host("[x]@::");
+    check_host("[x]@::", "http://[::1]:11434");
+    check_host("HTTP://0.0.0.0", "HTTP://127.0.0.1:11434");
+    check_invalid_host("[x@::");
 }
 
 /* ---- JSON ---- */

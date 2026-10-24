@@ -170,7 +170,7 @@ static ollama_status_t parse_hostport(const char *scheme, size_t scheme_len, lon
             port_len = rest - name_len - 2;
         }
         if (!valid_bracketed_host(name, name_len)) return OLLAMA_ERROR_REQUEST;
-    } else if (!brackets && memchr(hostinfo, ':', hostinfo_len) && loopback_for(hostinfo, hostinfo_len)) {
+    } else if (memchr(hostinfo, ':', hostinfo_len) && loopback_for(hostinfo, hostinfo_len)) {
         /* a bare "::", which Python rejects: it is how the server is told to listen on every
          * interface, so it is accepted like "[::]" */
         name = hostinfo;

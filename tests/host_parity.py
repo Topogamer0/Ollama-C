@@ -75,7 +75,8 @@ def connectable(result):
     loopback = '[::1]'
   else:
     return result
-  return f'OK {split.scheme}://{loopback}:{split.port}{split.path}'
+  scheme = result[3:].partition('://')[0]  # as typed: split.scheme is lowercased
+  return f'OK {scheme}://{loopback}:{split.port}{split.path}'
 
 
 def bracketed(host):
@@ -88,8 +89,8 @@ def bracketed(host):
   end = len(re.match(r'[^/?#]*', hostport).group())
   netloc = hostport[:end]
   user, at, hostinfo = netloc.rpartition('@')
-  if '[' in netloc or ']' in netloc or ':' not in hostinfo:
-    return None
+  if ('[' in netloc) != (']' in netloc) or ':' not in hostinfo:
+    return None  # unbalanced brackets stay invalid
   try:
     ip = ipaddress.IPv6Address(hostinfo)
   except ValueError:
@@ -141,7 +142,8 @@ FIXED = [
   'http://', 'https://[::1]', '0.0.0.0', 'localhost:11434/api/', '[::]:1', '[::1%]', '[::1%a%b]',
   '0.0.0.0:1234', 'https://0.0.0.0:4321', '[::]', '[::]:1234', 'http://[::]/path', '[::%eth0]', '::', 'http://::',
   '::/api', ':\t:', '0::0', '::ffff:0.0.0.0', '[::ffff:0.0.0.0]', '[::FFFF:0:0]:1', '[::0.0.0.0]', '::1', ':::1234',
-  '[x]@::', 'u@::', '0.0.0.1', '00.0.0.0', '[::ffff:0:0:0]', '[0:0:0:0:0:0:0:1]',
+  '[x]@::', 'u@::', '[x@::', ']@::', 'http://[x]@::/api', '0.0.0.1', '00.0.0.0', '[::ffff:0:0:0]',
+  '[0:0:0:0:0:0:0:1]', 'HTTP://0.0.0.0', 'Https://[::]:8080', 'HTTP://1.2.3.4',
 ]
 
 HOSTS = ['localhost', 'Example.COM', '1.2.3.4', '0.0.0.0', '::1', '[::1]', '[FE80::1%Eth0]', '[::ffff:1.2.3.4]',
@@ -158,7 +160,7 @@ def random_text(r, n):
 
 
 def random_host(r):
-  scheme = r.choice(['', '', 'http://', 'https://'])
+  scheme = r.choice(['', '', 'http://', 'https://', 'HTTP://'])
   user = r.choice(['', '', '', 'u@', 'u:p@', '[x]@', random_text(r, 4) + '@'])
   host = r.choice(HOSTS) if r.random() < 0.7 else random_text(r, 8)
   value = scheme + user + host + r.choice(PORTS) + r.choice(PATHS)
