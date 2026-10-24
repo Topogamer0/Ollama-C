@@ -56,14 +56,14 @@ extern "C" {
 /** @brief Minor version number of this header. */
 #define OLLAMA_C_VERSION_MINOR 2
 /** @brief Patch version number of this header. */
-#define OLLAMA_C_VERSION_PATCH 0
+#define OLLAMA_C_VERSION_PATCH 1
 /**
  * @brief Version of this header as a string, "MAJOR.MINOR.PATCH".
  *
  * Compare it with ollama_version() to detect an application compiled against a different header
  * than the library it runs with.
  */
-#define OLLAMA_C_VERSION "0.2.0"
+#define OLLAMA_C_VERSION "0.2.1"
 
 /**
  * @def OLLAMA_API
@@ -518,8 +518,13 @@ typedef struct ollama_client ollama_client_t;
  * a path is kept without its leading and trailing slashes. Like current Python versions (3.11+),
  * which raise ValueError, the client is not created when the host has unbalanced brackets, data
  * around the brackets, an invalid address between brackets, or a port that is not a number up to
- * 65535. IPvFuture literals (`[v1.x]`) must use the characters allowed by RFC 3986. For
- * example:
+ * 65535. IPvFuture literals (`[v1.x]`) must use the characters allowed by RFC 3986.
+ *
+ * Unlike the Python library, and like the Ollama command-line client, an unspecified address
+ * (`0.0.0.0` or `::`, with or without scheme, port and path) is replaced by the loopback address
+ * of the same family (`127.0.0.1` or `::1`): OLLAMA_HOST=0.0.0.0 makes the server listen on
+ * every interface, and connecting to 0.0.0.0 does not work everywhere (it fails on Windows). For
+ * the same reason a bare `::` is accepted like `[::]`. For example:
  *
  * | `host`                                   | base URL                      |
  * | ---------------------------------------- | ----------------------------- |
@@ -529,6 +534,10 @@ typedef struct ollama_client ollama_client_t;
  * | `"http://example.com"`                   | `http://example.com:80`       |
  * | `"https://example.com/api/"`             | `https://example.com:443/api` |
  * | `"[::1]:11434"`                          | `http://[::1]:11434`          |
+ * | `"0.0.0.0"`                              | `http://127.0.0.1:11434`      |
+ * | `"https://0.0.0.0:4321"`                 | `https://127.0.0.1:4321`      |
+ * | `"[::]:8080"`                            | `http://[::1]:8080`           |
+ * | `"::"`                                   | `http://[::1]:11434`          |
  *
  * If the OLLAMA_API_KEY environment variable is set and not empty, it is sent with every request
  * in an `Authorization: Bearer ...` header, which ollama_client_set_header() can replace or remove.

@@ -10,8 +10,11 @@ static bool is_digit(char c) { return c >= '0' && c <= '9'; }
 
 static bool is_hex(char c) { return is_digit(c) || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F'); }
 
-/* A dotted-quad IPv4 address, without leading zeros like Python's ipaddress. */
-static bool valid_ipv4(const char *s, size_t n) {
+static unsigned hex_value(char c) { return is_digit(c) ? (unsigned)(c - '0') : (unsigned)((c | 0x20) - 'a' + 10); }
+
+/* A dotted-quad IPv4 address, without leading zeros like Python's ipaddress.
+ * Its 4 bytes go to addr when it is not NULL. */
+static bool parse_ipv4(const char *s, size_t n, unsigned char *addr) {
     int octets = 0;
     size_t i = 0;
     while (octets < 4) {
@@ -20,6 +23,7 @@ static bool valid_ipv4(const char *s, size_t n) {
         while (i < n && is_digit(s[i]) && i - start < 3) value = value * 10 + (unsigned)(s[i++] - '0');
         size_t len = i - start;
         if (len == 0 || value > 255 || (len > 1 && s[start] == '0')) return false;
+        if (addr) addr[octets] = (unsigned char)value;
         octets++;
         if (octets < 4) {
             if (i >= n || s[i] != '.') return false;
@@ -29,15 +33,17 @@ static bool valid_ipv4(const char *s, size_t n) {
     return i == n;
 }
 
-/* An IPv6 address as accepted by Python's ipaddress, with an optional %zone. */
-static bool valid_ipv6(const char *s, size_t n) {
+/* An IPv6 address as accepted by Python's ipaddress, with an optional %zone.
+ * Its 16 bytes (without the zone) go to addr when it is not NULL. */
+static bool parse_ipv6(const char *s, size_t n, unsigned char *addr) {
     const char *zone = memchr(s, '%', n);
     if (zone) {
         size_t zone_len = n - (size_t)(zone - s) - 1;
         if (zone_len == 0 || memchr(zone + 1, '%', zone_len)) return false;
         n = (size_t)(zone - s);
     }
-    int groups = 0;
+    unsigned char bytes[16];
+    size_t count = 0, gap = 0; /* the bytes read, and where "::" stands among them */
     bool compressed = false;
     size_t i = 0;
     if (n >= 2 && s[0] == ':' && s[1] == ':') {
@@ -53,19 +59,24 @@ static bool valid_ipv6(const char *s, size_t n) {
         if (len == 0) return false;
         if (i == n && memchr(s + start, '.', len)) {
             /* an IPv4 address in the last two groups */
-            if (!valid_ipv4(s + start, len)) return false;
-            groups += 2;
+            if (count > 12 || !parse_ipv4(s + start, len, bytes + count)) return false;
+            count += 4;
         } else {
-            if (len > 4) return false;
-            for (size_t k = start; k < i; k++)
+            if (len > 4 || count > 14) return false;
+            unsigned value = 0;
+            for (size_t k = start; k < i; k++) {
                 if (!is_hex(s[k])) return false;
-            groups++;
+                value = value * 16 + hex_value(s[k]);
+            }
+            bytes[count++] = (unsigned char)(value >> 8);
+            bytes[count++] = (unsigned char)(value & 0xff);
         }
         if (i < n) {
             i++; /* ':' */
             if (i < n && s[i] == ':') {
                 if (compressed) return false;
                 compressed = true;
+                gap = count;
                 i++;
             } else if (i == n) {
                 return false;
@@ -73,7 +84,34 @@ static bool valid_ipv6(const char *s, size_t n) {
         }
     }
     /* "::" stands for at least one group */
-    return compressed ? groups <= 7 : groups == 8;
+    if (compressed ? count > 14 : count != 16) return false;
+    if (addr) {
+        size_t tail = count - gap;
+        memset(addr, 0, 16);
+        memcpy(addr, bytes, gap);
+        memcpy(addr + 16 - tail, bytes + gap, tail);
+    }
+    return true;
+}
+
+/*
+ * Like ConnectableHost() of the Ollama client in Go: a server told to listen on
+ * an unspecified address (0.0.0.0, ::) accepts connections on every interface,
+ * and OLLAMA_HOST, which the server and the clients share, keeps that address.
+ * Connecting to it only works by chance (on Linux, not on Windows), so the
+ * client uses the loopback address of the same family instead. Returns NULL
+ * for any other host. As with net.ParseIP(), an address with a zone is kept.
+ */
+static const char *loopback_for(const char *name, size_t n) {
+    static const unsigned char zero[16] = {0};
+    unsigned char addr[16];
+    if (parse_ipv4(name, n, addr)) return memcmp(addr, zero, 4) == 0 ? "127.0.0.1" : NULL;
+    if (memchr(name, '%', n) || !parse_ipv6(name, n, addr)) return NULL;
+    if (memcmp(addr, zero, 16) == 0) return "::1";
+    /* ::ffff:0.0.0.0, the unspecified IPv4 address mapped to IPv6 */
+    if (memcmp(addr, zero, 10) == 0 && addr[10] == 0xff && addr[11] == 0xff && memcmp(addr + 12, zero, 4) == 0)
+        return "127.0.0.1";
+    return NULL;
 }
 
 /*
@@ -93,7 +131,7 @@ static bool valid_bracketed_host(const char *s, size_t n) {
         }
         return true;
     }
-    return valid_ipv6(s, n);
+    return parse_ipv6(s, n, NULL);
 }
 
 /* Builds the URL from the host and port part of the address (after "scheme://"). */
@@ -132,6 +170,11 @@ static ollama_status_t parse_hostport(const char *scheme, size_t scheme_len, lon
             port_len = rest - name_len - 2;
         }
         if (!valid_bracketed_host(name, name_len)) return OLLAMA_ERROR_REQUEST;
+    } else if (memchr(hostinfo, ':', hostinfo_len) && loopback_for(hostinfo, hostinfo_len)) {
+        /* a bare "::", which Python rejects: it is how the server is told to listen on every
+         * interface, so it is accepted like "[::]" */
+        name = hostinfo;
+        name_len = hostinfo_len;
     } else {
         name = hostinfo;
         const char *colon = memchr(hostinfo, ':', hostinfo_len);
@@ -154,8 +197,9 @@ static ollama_status_t parse_hostport(const char *scheme, size_t scheme_len, lon
         if (value > 0) port = value; /* port 0 means the default, as in Python */
     }
 
-    if (name_len == 0) {
-        name = "127.0.0.1";
+    const char *loopback = name_len == 0 ? "127.0.0.1" : loopback_for(name, name_len);
+    if (loopback) {
+        name = loopback;
         name_len = strlen(name);
     }
     bool ipv6 = memchr(name, ':', name_len) != NULL;
@@ -202,9 +246,13 @@ static ollama_status_t parse_hostport(const char *scheme, size_t scheme_len, lon
  *   https://example.com       -> https://example.com:443
  *   example.com:56789/path/   -> http://example.com:56789/path
  *   [::1]                     -> http://[::1]:11434
+ *   0.0.0.0:1234              -> http://127.0.0.1:1234
+ *   [::] or ::                -> http://[::1]:11434
  *
  * Like the Python client, which gets a ValueError from urlsplit(), it rejects
  * unbalanced or invalid brackets and ports that are not numbers up to 65535.
+ * Unlike it, it connects to the loopback address when the host is 0.0.0.0 or
+ * ::, like the Ollama client in Go (see loopback_for()).
  */
 ollama_status_t parse_host(const char *host, char **out) {
     *out = NULL;

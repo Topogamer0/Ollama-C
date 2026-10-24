@@ -8,6 +8,10 @@ _parse_host() below is the function of ollama-python 0.6.3 (MIT License,
 Copyright (c) Ollama), run with the urllib of this Python. The checks of
 current CPython (3.11+, _check_bracketed_netloc) are required: with an older
 urllib the test is skipped (exit code 77).
+
+The C client also connects to the loopback address when the host is an
+unspecified address (0.0.0.0, ::), like ConnectableHost() of the Ollama client
+in Go: expected() applies that to the result of Python.
 """
 
 import ipaddress
@@ -54,6 +58,56 @@ def python(host):
     return 'ERR'
 
 
+def connectable(result):
+  """ConnectableHost() of the Ollama client in Go, applied to a result of python()."""
+  if result == 'ERR':
+    return result
+  split = urllib.parse.urlsplit(result[3:])
+  try:
+    ip = ipaddress.ip_address(split.hostname)
+  except ValueError:
+    return result
+  if ip.version == 6 and ip.scope_id:
+    return result  # net.ParseIP() rejects zones
+  if (ip.ipv4_mapped if ip.version == 6 else ip) == ipaddress.IPv4Address('0.0.0.0'):
+    loopback = '127.0.0.1'
+  elif ip.is_unspecified:
+    loopback = '[::1]'
+  else:
+    return result
+  scheme = result[3:].partition('://')[0]  # as typed: split.scheme is lowercased
+  return f'OK {scheme}://{loopback}:{split.port}{split.path}'
+
+
+def bracketed(host):
+  """Adds the brackets to a bare unspecified IPv6 address ("::"), which the C client accepts."""
+  scheme, sep, hostport = host.partition('://')
+  if not hostport:
+    scheme, sep, hostport = '', '', host
+  for c in '\t\r\n':
+    hostport = hostport.replace(c, '')
+  end = len(re.match(r'[^/?#]*', hostport).group())
+  netloc = hostport[:end]
+  user, at, hostinfo = netloc.rpartition('@')
+  if ('[' in netloc) != (']' in netloc) or ':' not in hostinfo:
+    return None  # unbalanced brackets stay invalid
+  try:
+    ip = ipaddress.IPv6Address(hostinfo)
+  except ValueError:
+    return None
+  if ip.scope_id or connectable(f'OK http://[{ip}]:1') == f'OK http://[{ip}]:1':
+    return None
+  return f'{scheme}{sep}{user}{at}[{hostinfo}]{hostport[end:]}'
+
+
+def expected(host):
+  """The result expected from the C client."""
+  result = python(host)
+  if result == 'ERR' and (fixed := bracketed(host)):
+    result = python(fixed)
+  return connectable(result)
+
+
 C0_OR_SPACE = ''.join(chr(i) for i in range(33))
 
 
@@ -86,11 +140,16 @@ FIXED = [
   'u[x]@[::1]', 'u]@[::1', '[::1]@example.com', 'x[::1]', '[::1]x:80', '[::1]]', '[::1]:80@x',
   '192.168.1.10:11434\r', 'http://localhost:11434\r\n', 'local\thost', '[::1]:11434\r', 'a%B', '[]',
   'http://', 'https://[::1]', '0.0.0.0', 'localhost:11434/api/', '[::]:1', '[::1%]', '[::1%a%b]',
+  '0.0.0.0:1234', 'https://0.0.0.0:4321', '[::]', '[::]:1234', 'http://[::]/path', '[::%eth0]', '::', 'http://::',
+  '::/api', ':\t:', '0::0', '::ffff:0.0.0.0', '[::ffff:0.0.0.0]', '[::FFFF:0:0]:1', '[::0.0.0.0]', '::1', ':::1234',
+  '[x]@::', 'u@::', '[x@::', ']@::', 'http://[x]@::/api', '0.0.0.1', '00.0.0.0', '[::ffff:0:0:0]',
+  '[0:0:0:0:0:0:0:1]', 'HTTP://0.0.0.0', 'Https://[::]:8080', 'HTTP://1.2.3.4',
 ]
 
 HOSTS = ['localhost', 'Example.COM', '1.2.3.4', '0.0.0.0', '::1', '[::1]', '[FE80::1%Eth0]', '[::ffff:1.2.3.4]',
          '[1:2:3:4:5:6:7::]', '[1::2::3]', '[1.2.3.4]', '[]', '[::1', '::1]', 'x[::1]', '[::1]x', '[::1]]', '',
-         '[0:0:0:0:0:0:0:0]', '[::1.2.3.256]', '[12345::]', '[::g]', 'a%B', '[::1%25x]']
+         '[0:0:0:0:0:0:0:0]', '[::1.2.3.256]', '[12345::]', '[::g]', 'a%B', '[::1%25x]', '[::]', '::', '0::',
+         '[::ffff:0.0.0.0]', '[::%x]', '0.0.0.00']
 PORTS = ['', '', ':', ':80', ':11434', ':000080', ':0', ':65535', ':65536', ':abc', ':8\r', ':1:2', ':+1', ': 1']
 PATHS = ['', '', '/', '/api', '/a/b/', '?q', '#f', '/x?y#z']
 ALPHABET = 'abXY09.-_~%@:[]/?#\t\r\n !'
@@ -101,7 +160,7 @@ def random_text(r, n):
 
 
 def random_host(r):
-  scheme = r.choice(['', '', 'http://', 'https://'])
+  scheme = r.choice(['', '', 'http://', 'https://', 'HTTP://'])
   user = r.choice(['', '', '', 'u@', 'u:p@', '[x]@', random_text(r, 4) + '@'])
   host = r.choice(HOSTS) if r.random() < 0.7 else random_text(r, 8)
   value = scheme + user + host + r.choice(PORTS) + r.choice(PATHS)
@@ -129,11 +188,11 @@ def main():
   failures = 0
   for host, line in zip(hosts, lines):
     c = 'OK ' + bytes.fromhex(line[3:]).decode('utf-8') if line.startswith('OK ') else 'ERR'
-    py = python(host)
+    py = expected(host)
     if c != py:
       failures += 1
       if failures <= 20:
-        print(f'{host!r}: python {py!r}, C {c!r}')
+        print(f'{host!r}: expected {py!r}, C {c!r}')
   print(f'{len(hosts)} hosts compared, {failures} differences')
   return 1 if failures else 0
 

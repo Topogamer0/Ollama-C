@@ -37,8 +37,8 @@ int main(void) {
   `create`, `create_blob`, `list`, `show`, `ps`, `copy`, `delete`, `web_search`, `web_fetch`, `systemone`
 - Streaming (`stream=True`) through iterators
 - Tool calling, thinking models, structured outputs (JSON schemas), images, logprobs
-- Same configuration as Python: `OLLAMA_HOST` (with the same host parsing rules), `OLLAMA_API_KEY`,
-  custom headers, timeout
+- Same configuration as Python: `OLLAMA_HOST` (with the same host parsing rules; `0.0.0.0` reaches
+  the local server on every platform), `OLLAMA_API_KEY`, custom headers, timeout
 - Typed responses, plus the full JSON of every response
 - A small JSON API for options, schemas, tool definitions and tool arguments
 - No dependencies besides libcurl; works from C and C++
@@ -55,6 +55,19 @@ Any other system with a C99 compiler, CMake 3.14+ and libcurl 7.28+ should work 
 FreeBSD or MinGW), but it is not tested. On Windows, Visual Studio 2019 16.10 or later is needed.
 The commands below use `ctest --test-dir` and `cmake --install`, which need CMake 3.20 and 3.15;
 with older versions run `ctest` from the build directory and `cmake --build build --target install`.
+
+## Install with Homebrew
+
+On macOS (Apple Silicon and Intel) and Linux:
+
+```sh
+brew install topogamer0/tap/ollama-c
+```
+
+This builds and installs the shared library, `ollama.h` and the CMake and pkg-config files. Use it
+with `find_package(ollama-c)` and `ollama::ollama`, or with
+`pkg-config --cflags --libs ollama-c` (no `--static` needed: Homebrew installs a shared library;
+on Linux also pass `-Wl,-rpath,"$(brew --prefix)/lib"` so that the program finds it at run time).
 
 ## Building
 
@@ -169,7 +182,10 @@ ollama_client_free(client);
 ```
 
 `ollama_client_new(NULL)` reads `OLLAMA_HOST` and accepts the same values as the Python client
-(`0.0.0.0`, `:8080`, `example.com/path`, `https://[::1]:11434`, ...). When `OLLAMA_API_KEY` is set
+(`:8080`, `example.com/path`, `https://[::1]:11434`, ...). `OLLAMA_HOST=0.0.0.0`, which makes the
+server listen on every interface, works on every platform, Windows included: like the `ollama`
+command, the client connects to `127.0.0.1` when the host is `0.0.0.0`, and to `::1` when it is
+`::` (`[::]`, `[::]:8080`, `https://0.0.0.0:4321`, ...). When `OLLAMA_API_KEY` is set
 it is sent as `Authorization: Bearer ...`, which is needed for `ollama_web_search`,
 `ollama_web_fetch` and for using ollama.com as host.
 
@@ -257,6 +273,8 @@ The default client (`NULL`) is not thread-safe. In multi-threaded programs call
 - Options, formats and other free-form dicts are `ollama_json_t` values.
 - `think` and `keep_alive` are strings (`"true"`, `"high"`, `"5m"`, `"-1"`).
 - Chat streams can assemble the full message for you (`ollama_stream_message`).
+- An `OLLAMA_HOST` of `0.0.0.0` or `::` connects to `127.0.0.1` or `::1`, like the `ollama` command
+  (Python connects to `0.0.0.0`, which fails on Windows, and rejects a bare `::`).
 
 ## Examples
 

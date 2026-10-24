@@ -1,0 +1,71 @@
+name: Release
+
+# A tag vX.Y.Z updates the ollama-c formula of the Homebrew tap
+# (https://github.com/Topogamer0/homebrew-tap) to the source archive of the tag.
+# The GitHub release is created by hand: this workflow does not create one and
+# does not look at it, so it works whether the release exists or not.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  homebrew:
+    name: Update the Homebrew formula
+    if: ${{ !contains(github.ref_name, '-') }}
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Compare the tag with the project version
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          # project(ollama-c
+          #     VERSION X.Y.Z
+          version="$(sed -n 's/^[[:space:]]*VERSION[[:space:]]\{1,\}\([0-9][0-9.]*\).*/\1/p' CMakeLists.txt | head -n 1)"
+          if [ "v$version" != "$TAG" ]; then
+            echo "::error::Tag $TAG does not match the version in CMakeLists.txt (${version:-not found})."
+            exit 1
+          fi
+
+      - name: Check out the tap
+        uses: actions/checkout@v5
+        with:
+          repository: Topogamer0/homebrew-tap
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: homebrew-tap
+          fetch-depth: 0
+
+      - name: Update Formula/ollama-c.rb
+        working-directory: homebrew-tap
+        env:
+          TAG: ${{ github.ref_name }}
+        run: python3 scripts/bump-formula.py Formula/ollama-c.rb "${TAG#v}"
+
+      - name: Commit and push
+        working-directory: homebrew-tap
+        env:
+          FORMULA: ollama-c
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          VERSION="${TAG#v}"
+          if git diff --quiet; then
+            echo "Formula/$FORMULA.rb is already at $VERSION."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit --all --message "$FORMULA $VERSION"
+          # Another release may have pushed to the tap meanwhile: rebase and retry.
+          for attempt in 1 2 3 4 5; do
+            if git push origin HEAD:main; then exit 0; fi
+            sleep $((attempt * 5))
+            git pull --rebase origin main
+          done
+          echo "::error::Could not push to Topogamer0/homebrew-tap."
+          exit 1
