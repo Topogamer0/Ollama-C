@@ -103,7 +103,7 @@ static bool parse_ipv6(const char *s, size_t n, unsigned char *addr) {
  * for any other host. As with net.ParseIP(), an address with a zone is kept.
  */
 static const char *loopback_for(const char *name, size_t n) {
-    static const unsigned char zero[16];
+    static const unsigned char zero[16] = {0};
     unsigned char addr[16];
     if (parse_ipv4(name, n, addr)) return memcmp(addr, zero, 4) == 0 ? "127.0.0.1" : NULL;
     if (memchr(name, '%', n) || !parse_ipv6(name, n, addr)) return NULL;
